@@ -1,0 +1,47 @@
+[22:01:47] [Server thread/INFO]: Starting minecraft server version 1.10.2
+[22:01:47] [Server thread/INFO]: Loading properties
+[22:01:47] [Server thread/INFO]: Default game type: SURVIVAL
+[22:01:47] [Server thread/INFO]: Generating keypair
+[22:01:47] [Server thread/INFO]: Starting Minecraft server on *:25565
+[22:01:47] [Server thread/INFO]: Using epoll channel type
+[22:01:47] [Server thread/WARN]: Failed to load operators list: 
+java.io.FileNotFoundException: ops.json (No such file or directory)
+	at java.io.FileInputStream.open0(Native Method) ~[?:1.8.0_91]
+	at java.io.FileInputStream.open(FileInputStream.java:195) ~[?:1.8.0_91]
+	at java.io.FileInputStream.<init>(FileInputStream.java:138) ~[?:1.8.0_91]
+	at com.google.common.io.Files.newReader(Files.java:86) ~[minecraft_server.1.10.2.jar:?]
+	at mt.g(SourceFile:136) ~[minecraft_server.1.10.2.jar:?]
+	at lc.A(SourceFile:107) [minecraft_server.1.10.2.jar:?]
+	at lc.<init>(SourceFile:29) [minecraft_server.1.10.2.jar:?]
+	at ld.j(SourceFile:185) [minecraft_server.1.10.2.jar:?]
+	at net.minecraft.server.MinecraftServer.run(SourceFile:428) [minecraft_server.1.10.2.jar:?]
+	at java.lang.Thread.run(Thread.java:745) [?:1.8.0_91]
+[22:01:47] [Server thread/WARN]: Failed to load white-list: 
+java.io.FileNotFoundException: whitelist.json (No such file or directory)
+	at java.io.FileInputStream.open0(Native Method) ~[?:1.8.0_91]
+	at java.io.FileInputStream.open(FileInputStream.java:195) ~[?:1.8.0_91]
+	at java.io.FileInputStream.<init>(FileInputStream.java:138) ~[?:1.8.0_91]
+	at com.google.common.io.Files.newReader(Files.java:86) ~[minecraft_server.1.10.2.jar:?]
+	at mt.g(SourceFile:136) ~[minecraft_server.1.10.2.jar:?]
+	at lc.C(SourceFile:123) [minecraft_server.1.10.2.jar:?]
+	at lc.<init>(SourceFile:30) [minecraft_server.1.10.2.jar:?]
+	at ld.j(SourceFile:185) [minecraft_server.1.10.2.jar:?]
+	at net.minecraft.server.MinecraftServer.run(SourceFile:428) [minecraft_server.1.10.2.jar:?]
+	at java.lang.Thread.run(Thread.java:745) [?:1.8.0_91]
+[22:01:47] [Server thread/INFO]: Preparing level "world"
+[22:01:47] [Server thread/WARN]: Unable to find spawn biome
+[22:01:49] [Server thread/INFO]: Preparing start region for level 0
+[22:01:50] [Server thread/INFO]: Preparing spawn area: 6%
+[22:01:51] [Server thread/INFO]: Preparing spawn area: 11%
+[22:01:52] [Server thread/INFO]: Preparing spawn area: 16%
+[22:01:53] [Server thread/INFO]: Preparing spawn area: 25%
+[22:01:54] [Server thread/INFO]: Preparing spawn area: 32%
+[22:01:55] [Server thread/INFO]: Preparing spawn area: 38%
+[22:01:56] [Server thread/INFO]: Preparing spawn area: 46%
+[22:01:57] [Server thread/INFO]: Preparing spawn area: 52%
+[22:01:59] [Server thread/INFO]: Preparing spawn area: 61%
+[22:02:00] [Server thread/INFO]: Preparing spawn area: 69%
+[22:02:01] [Server thread/INFO]: Preparing spawn area: 77%
+[22:02:02] [Server thread/INFO]: Preparing spawn area: 84%
+[22:02:03] [Server thread/INFO]: Preparing spawn area: 94%
+[22:02:03] [Server thread/INFO]: Done (16.023s)! For help, type "help" or "?"
