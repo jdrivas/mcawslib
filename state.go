@@ -16,32 +16,66 @@ import(
   "github.com/Sirupsen/logrus"
 )
 
-func ArchiveAndPublish(rcon *Rcon, serverDirectory string, bucketName string, user string, config *aws.Config) (resp *PublishedArchiveResponse, err error) {
+type PublishedArchiveResponse struct {
+  ArchiveFilename string
+  BucketName string
+  StoredPath string
+  UserName string
+  PutObjectOutput *s3.PutObjectOutput
+}
+
+
+func ArchiveAndPublish(rcon *Rcon, serverDirectory, bucketName, publishPath string, config *aws.Config) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
   archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
   archivePath := filepath.Join(archiveDir, archiveFileName)
 
-  log.Info(logrus.Fields{"user": user,"archiveDir": serverDirectory, "bucket": bucketName,}, "Creating Archive.")
+  log.Info(logrus.Fields{"archiveDir": serverDirectory, "bucket": bucketName, "publishPath": publishPath}, "Creating Archive.")
 
   err = ArchiveServer(rcon, serverDirectory, archivePath)
   if err != nil { return nil, err }
-  resp, err = PublishArchive(archivePath, bucketName, user, config)
+  resp, err = PublishArchive(archivePath, bucketName, publishPath, config)
   return resp, err
 }
 
+// func ArchiveAndPublish(rcon *Rcon, serverDirectory string, bucketName string, user string, config *aws.Config) (resp *PublishedArchiveResponse, err error) {
+//   s := NewServer(user, "old-server", rcon.Host, rcon.Port, rcon.Password, bucketName, serverDirectory, config)
+//   resp, err = s.SnapshotAndPublish()
+//   // archiveDir := os.TempDir()
+//   // archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
+//   // archivePath := filepath.Join(archiveDir, archiveFileName)
+
+//   // log.Info(logrus.Fields{"user": user,"archiveDir": serverDirectory, "bucket": bucketName,}, "Creating Archive.")
+
+//   // err = ArchiveServer(rcon, serverDirectory, archivePath)
+//   // if err != nil { return nil, err }
+//   // resp, err = PublishArchive(archivePath, bucketName, user, config)
+//   return resp, err
+// }
+
+// Produce and archive of a server.
+// Use an rcon connection to first save-all, then save-off before the archive.
+// When the archive is finished use rcon to save-on.
+// If rcon is nil, then don't do the save-off/save-all/save-on/ THIS IS NOT RECOMMENDED.
 func ArchiveServer(rcon *Rcon, serverDirectory string, archiveFileName string) (err error) {
-  _, err = rcon.SaveAll()
-  if err != nil { return err }
-  _, err = rcon.SaveOff()
-  if err != nil { return err }
+
+  if rcon != nil {
+    _, err = rcon.SaveAll()
+    if err != nil { return err }
+    _, err = rcon.SaveOff()
+    if err != nil { return err }
+  }
 
   err = CreateServerArchive(serverDirectory, archiveFileName)
 
-  _,rcErr := rcon.SaveOn()
-  if err != nil { return err }
-  if rcErr != nil {
-    err = fmt.Errorf("ArchiveServer: server archived, problem turning auto-save back on: %s", err)
+  if rcon != nil {
+    _,rcErr := rcon.SaveOn()
+    if err != nil { return err }
+    if rcErr != nil {
+      err = fmt.Errorf("ArchiveServer: server archived, problem turning auto-save back on: %s", err)
+    }
   }
+
   log.Info(logrus.Fields{"dir": serverDirectory, "archive": archiveFileName},"Archived server.")
   return err
 }
@@ -131,18 +165,9 @@ func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
   return err
 }
 
-type PublishedArchiveResponse struct {
-  ArchiveFilename string
-  BucketName string
-  StoredPath string
-  UserName string
-  PutObjectOutput *s3.PutObjectOutput
-}
-// Puts the archive in the provided bucket on S3 in a 'directory' for the user. Bucket  must already exist.
+// Puts the archive in the provided bucket:path on S3 in a 'directory' for the user. Bucket must already exist.
 // Config must have keys and region.
-// The structure in the bucket is:
-//    bucket:/<username>/archives/<ansi-time-string>-<username>-archive
-func PublishArchive(archiveFileName string, bucketName string, user string, config *aws.Config) (*PublishedArchiveResponse, error) {
+func PublishArchive(archiveFileName string, bucketName string, path string, config *aws.Config) (*PublishedArchiveResponse, error) {
   s3svc := s3.New(session.New(config))
   file, err := os.Open(archiveFileName)
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't open archive file: %s", err)}
@@ -158,7 +183,7 @@ func PublishArchive(archiveFileName string, bucketName string, user string, conf
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't read archive file: %s: %s", archiveFileName, err)}
   fileBytes := bytes.NewReader(buffer)
 
-  path := getArchiveName(user)
+  // path := getArchiveName(user)
   log.Debug(logrus.Fields{
     "archiveFile": archiveFileName, 
     "bytes": fileSize, 
@@ -166,7 +191,7 @@ func PublishArchive(archiveFileName string, bucketName string, user string, conf
     "bucket": bucketName, 
     "archive": path}, "PublishArchive: Writing Archive.")
 
-  // TOTO: Lookinto this and in particular figure out how to use an iamrole for this.
+  // TODO: Lookinto this and in particular figure out how to use an iamrole for this.
   aclString := "public-read"
 
   params := &s3.PutObjectInput{
@@ -183,7 +208,7 @@ func PublishArchive(archiveFileName string, bucketName string, user string, conf
     ArchiveFilename: archiveFileName,
     BucketName: bucketName,
     StoredPath: path,
-    UserName: user,
+    // UserName: user,
     PutObjectOutput: resp,
   }
 
