@@ -1,2 +1,2 @@
-# mclib
-Go library for managing minecraft servers.
+# mcawslib
+Go library for managing minecraft servers on AWS.
