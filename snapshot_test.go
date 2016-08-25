@@ -53,6 +53,7 @@ func TestNewSnapshotPath(t *testing.T) {
 // TODO: This is more of an acceptance test that can be used as part of a more generic release process.
 // Mostly because it takes to long. So either figure out some VCR like thing, or move it out of unit tests.
 func TestSnapshotAndPublish(t *testing.T) {
+  if testing.Short() { t.SkipNow()}
   SetLogLevel(logrus.DebugLevel)
   s := testServer(t, false)
   _, err := s.SnapshotAndPublish()

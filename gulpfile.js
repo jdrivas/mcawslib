@@ -7,15 +7,14 @@ var util = require('gulp-util')
 var readline = require('readline')
 
 var gulpProcess;
-var verbose = false;
+var verbose = true;
+var short = true
 var rl = readline.createInterface({input: process.stdin, output: process.stdin});
 
 gulp.task('test', function() {
-  if(verbose) {
-    args = ["test", "-v"]
-  } else {
-    args = ["test"]
-  }
+  args = ["test"]
+  if (verbose) { args.push("-v");}
+  if(short) {args.push("-test.short");}
 
   test = child.spawnSync("go", args)
   if(test.status == 0) {
@@ -61,6 +60,13 @@ function doCommand(command) {
         verbose = true;
       }
       util.log("Verbose is now " + verbose.toString())
+      break;
+    case 'long':
+      short = false;
+      util.log("Short test is now " + short.toString())
+    case 'short':
+      short = true;
+      util.log("Short test is now " + short.toString())
       break;
     case '': // just eat returns.
       break
