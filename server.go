@@ -84,7 +84,7 @@ func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, 
 
 func (s *Server) NewRcon() (rcon *Rcon, err error) {
   rcon, err = NewRcon(s.ServerIp, s.RconPort, s.RconPassword)  
-  if err != nil {
+  if err == nil {
     s.Rcon = rcon
   }
   return rcon, err

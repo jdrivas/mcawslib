@@ -17,7 +17,7 @@ type Rcon struct {
 }
 
 
-// create a new connection.
+// create a new live connection.
 func NewRcon(host string, port string, pw string) (rcon *Rcon, err error) {
   p, err := strconv.Atoi(port)
   if err == nil {
@@ -43,7 +43,7 @@ func NewRconWithRetry(host, port, pw string, retries int, retryWait time.Duratio
 
   f := logrus.Fields{
     "connection": host + ":" + port, 
-    "wait": retryWait, 
+    "wait": retryWait.String(), 
     "count": 0,
   }
 
@@ -73,7 +73,7 @@ func (rc *Rcon) HasConnection() bool {
 }
 
 func (rc *Rcon) Send(command string) (reply string, err error ) {
-  if rc.Client == nil { return reply, fmt.Errorf("Rcon: Host connection empty.")}
+  if rc.Client == nil { return reply, fmt.Errorf("Rcon: Host connection client nil.")}
   reply, err = rc.Client.SendCommand(command)
   if err != nil { err = fmt.Errorf("Failed to send \"%s\" to server: %s", command, err)}
   return reply, err
