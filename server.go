@@ -49,7 +49,7 @@ func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, a
 func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
 
   var rcon  *Rcon
-  if !s.NoRcon() && !s.Rcon.HasConnection() {
+  if s.GoodRcon() && !s.Rcon.HasConnection() {
     rcon, err = s.NewRcon()
     if err != nil { return resp, fmt.Errorf("Can't create rcon connection for snapshot snapshot: %s", err)}
   }
@@ -63,7 +63,7 @@ func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err erro
 // Will fail if the server doesn't have serverIp, rconPort, and rconPassword.
 func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration) (resp *PublishedArchiveResponse, err error) {
 
-  if !s.NoRcon() { 
+  if s.NoRcon() { 
     return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.ServerIp, s.RconPort )
   }
   if len(s.RconPassword) == 0 {
@@ -108,6 +108,10 @@ func (s *Server) RconPortString() (string) {
 func (s *Server) NoRcon() (bool) {
   // return len(s.ServerIp) == 0 || s.RconPort == 0
   return len(s.ServerIp) == 0 || len(s.RconPort) == 0
+}
+
+func (s *Server) GoodRcon() (bool) {
+  return !s.NoRcon()
 }
 
 const (
