@@ -45,7 +45,7 @@ func NewServer(user, name, serverIp string, rconPort int, rconPw, archiveBucket,
 // the server will be made to issue save-all then save-off before
 // the snapshot is taken and save-on after once the snapshot has
 // been ade but before it's been published to S3. THIS IS NOT RECOMMENDED FOR PRDOCUTION.
-func (s *Server)SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
+func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
 
   var rcon  *Rcon
   if !s.NoRcon() {
@@ -53,13 +53,43 @@ func (s *Server)SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error
     if err != nil { return resp, fmt.Errorf("Can't create rcon connection for snapshot snapshot: %s", err)}
   }
 
+  resp, err = s.archiveAndPublish(rcon)
+  return resp, err
+}
+
+// Will keep trying to get the RCON connection, but sleeping for waitTime and then retrying, up to
+// retries times.
+// Will fail if the server doesn't have serverIp, rconPort, and rconPassword.
+func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration) (resp *PublishedArchiveResponse, err error) {
+
+  if !s.NoRcon() { 
+    return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.ServerIp, s.RconPort )
+  }
+  if len(s.RconPassword) == 0 {
+    return nil, fmt.Errorf("No rcon password.")
+  }
+  rcon, err := s.NewRconWithRetry(retries, waitTime)
+  resp, err = s.archiveAndPublish(rcon)
+  return resp, err
+}
+
+func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, err error) {
   resp, err = ArchiveAndPublish(rcon, s.ServerDirectory, s.ArchiveBucket, s.newSnapshotPath(time.Now()), s.AwsConfig)
   return resp, err
 }
 
 func (s *Server) NewRcon() (rcon *Rcon, err error) {
-  rcon, err = NewRcon(s.ServerIp, fmt.Sprintf("%d",s.RconPort), s.RconPassword)  
+  rcon, err = NewRcon(s.ServerIp, s.RconPortString(), s.RconPassword)  
   return rcon, err
+}
+
+func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
+  rcon, err = NewRconWithRetry(s.ServerIp, s.RconPortString(), s.RconPassword, retries, waitTime)
+  return rcon, err
+}
+
+func (s *Server) RconPortString() (string) {
+  return fmt.Sprintf("%d", s.RconPort)
 }
 
 func (s *Server) NoRcon() (bool) {
