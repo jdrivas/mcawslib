@@ -16,17 +16,18 @@ type Server struct {
   User string
   Name string
   ServerIp string
-  RconPort int
+  RconPort string
   RconPassword string
+  Rcon *Rcon
   ArchiveBucket string
   ServerDirectory string
   AwsConfig *aws.Config
 }
 
-func NewServer(user, name, serverIp string, rconPort int, rconPw, archiveBucket, serverDirectory string, config *aws.Config) (s *Server) {
+func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, archiveBucket, serverDirectory string, config *aws.Config) (s *Server) {
   s = new(Server)
-  s.User = user
-  s.Name = name
+  s.User = userName
+  s.Name = serverName
   s.ServerIp = serverIp
   s.RconPort = rconPort
   s.RconPassword = rconPw
@@ -48,7 +49,7 @@ func NewServer(user, name, serverIp string, rconPort int, rconPw, archiveBucket,
 func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
 
   var rcon  *Rcon
-  if !s.NoRcon() {
+  if !s.NoRcon() && !s.Rcon.HasConnection() {
     rcon, err = s.NewRcon()
     if err != nil { return resp, fmt.Errorf("Can't create rcon connection for snapshot snapshot: %s", err)}
   }
@@ -68,7 +69,13 @@ func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration
   if len(s.RconPassword) == 0 {
     return nil, fmt.Errorf("No rcon password.")
   }
-  rcon, err := s.NewRconWithRetry(retries, waitTime)
+
+  var rcon *Rcon
+  if !s.Rcon.HasConnection() {
+    rcon, err = s.NewRconWithRetry(retries, waitTime)
+    s.Rcon = rcon
+  }
+
   resp, err = s.archiveAndPublish(rcon)
   return resp, err
 }
@@ -80,11 +87,17 @@ func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, 
 
 func (s *Server) NewRcon() (rcon *Rcon, err error) {
   rcon, err = NewRcon(s.ServerIp, s.RconPortString(), s.RconPassword)  
+  if err != nil {
+    s.Rcon = rcon
+  }
   return rcon, err
 }
 
 func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
   rcon, err = NewRconWithRetry(s.ServerIp, s.RconPortString(), s.RconPassword, retries, waitTime)
+  if err != nil {
+    s.Rcon = rcon
+  }
   return rcon, err
 }
 
@@ -93,7 +106,8 @@ func (s *Server) RconPortString() (string) {
 }
 
 func (s *Server) NoRcon() (bool) {
-  return len(s.ServerIp) == 0 || s.RconPort == 0
+  // return len(s.ServerIp) == 0 || s.RconPort == 0
+  return len(s.ServerIp) == 0 || len(s.RconPort) == 0
 }
 
 const (
