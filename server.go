@@ -49,7 +49,7 @@ func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, a
 func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
 
   var rcon  *Rcon
-  if s.GoodRcon() && !s.Rcon.HasConnection() {
+  if s.GoodRcon() && !s.HasRconConnection() {
     rcon, err = s.NewRcon()
     if err != nil { return resp, fmt.Errorf("Can't create rcon connection for snapshot snapshot: %s", err)}
   }

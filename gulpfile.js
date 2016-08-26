@@ -64,6 +64,7 @@ function doCommand(command) {
     case 'long':
       short = false;
       util.log("Short test is now " + short.toString())
+      break;
     case 'short':
       short = true;
       util.log("Short test is now " + short.toString())
