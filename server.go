@@ -83,7 +83,7 @@ func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, 
 }
 
 func (s *Server) NewRcon() (rcon *Rcon, err error) {
-  rcon, err = NewRcon(s.ServerIp, s.RconPortString(), s.RconPassword)  
+  rcon, err = NewRcon(s.ServerIp, s.RconPort, s.RconPassword)  
   if err != nil {
     s.Rcon = rcon
   }
@@ -93,16 +93,13 @@ func (s *Server) NewRcon() (rcon *Rcon, err error) {
 // Gets a new Rcon connection for the seever. Will retry after waitTime if the connection attempt fails,
 // will try up to retry times. Blocks until finished.
 func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
-  rcon, err = NewRconWithRetry(s.ServerIp, s.RconPortString(), s.RconPassword, retries, waitTime)
+  rcon, err = NewRconWithRetry(s.ServerIp, s.RconPort, s.RconPassword, retries, waitTime)
   if err != nil {
     s.Rcon = rcon
   }
   return rcon, err
 }
 
-func (s *Server) RconPortString() (string) {
-  return fmt.Sprintf("%d", s.RconPort)
-}
 
 func (s *Server) HasRconConnection() (bool) {
   if s.Rcon == nil {
