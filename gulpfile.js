@@ -31,6 +31,10 @@ gulp.task('test', function() {
     for (var l in lines) {
       util.log(chalk.red(lines[l]));
     }
+    var errLines = test.stderr.toString().split("\n");
+    for (var l in errLines) {
+      util.log(chalk.black.bold(errLines[l]));
+    }
   }
   return test
 })
@@ -69,6 +73,9 @@ function doCommand(command) {
       short = true;
       util.log("Short test is now " + short.toString())
       break;
+    case 'quit':
+      process.exit();
+    break;
     case '': // just eat returns.
       break
     default:

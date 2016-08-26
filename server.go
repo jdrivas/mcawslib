@@ -3,7 +3,8 @@ package mclib
 import(
   "fmt"
   "time"
-  "github.com/aws/aws-sdk-go/aws"
+  // "github.com/aws/aws-sdk-go/aws"
+  "github.com/aws/aws-sdk-go/aws/session"
   // "github.com/aws/aws-sdk-go/service/s3"
   // "github.com/Sirupsen/logrus"
 )
@@ -21,10 +22,10 @@ type Server struct {
   Rcon *Rcon
   ArchiveBucket string
   ServerDirectory string
-  AwsConfig *aws.Config
+  AwsSession *session.Session
 }
 
-func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, archiveBucket, serverDirectory string, config *aws.Config) (s *Server) {
+func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, archiveBucket, serverDirectory string, sess *session.Session) (s *Server) {
   s = new(Server)
   s.User = userName
   s.Name = serverName
@@ -33,7 +34,7 @@ func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, a
   s.RconPassword = rconPw
   s.ArchiveBucket = archiveBucket
   s.ServerDirectory = serverDirectory
-  s.AwsConfig = config
+  s.AwsSession = sess
   return s
 }
 
@@ -78,7 +79,7 @@ func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration
 }
 
 func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, err error) {
-  resp, err = ArchiveAndPublish(rcon, s.ServerDirectory, s.ArchiveBucket, s.newSnapshotPath(time.Now()), s.AwsConfig)
+  resp, err = ArchiveAndPublish(rcon, s.ServerDirectory, s.ArchiveBucket, s.newSnapshotPath(time.Now()), s.AwsSession)
   return resp, err
 }
 
@@ -116,12 +117,7 @@ func (s *Server) GoodRcon() (bool) {
   return !s.NoRcon()
 }
 
-const (
-  snapshotPathElement = "snapshots"
-  snapshotFileExt = "-snapshot.zip"
-)
-
-func (s *Server)newSnapshotPath(when time.Time) (string) {
-  timeString := when.Format(time.RFC3339)
-  return s.User + "/" + s.Name + "/" + snapshotPathElement + "/" + timeString + "-" + s.User + "-" + s.Name + snapshotFileExt
+func (s *Server) newSnapshotPath(when time.Time) (string) {
+  return newSnapshotPath(s.User, s.Name, when)
 }
+

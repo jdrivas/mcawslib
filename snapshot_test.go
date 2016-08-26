@@ -6,6 +6,10 @@ import (
   "time"
   "github.com/stretchr/testify/assert"
   "github.com/Sirupsen/logrus"
+
+  // LOOKING FOR TROUBLE HERE
+  // "awslib"
+  // "github.com/jdrivas/awslib"
 )
 
 
@@ -29,8 +33,28 @@ func TestSnapshotAndPublish(t *testing.T) {
   if testing.Short() { t.SkipNow()}
   SetLogLevel(logrus.DebugLevel)
   s := testServer(t, false)
-  _, err := s.SnapshotAndPublish()
+  resp, err := s.SnapshotAndPublish()
   if assert.NoError(t, err) {
+    // Not much of a test this.
+    // This should instead do a regex to ensure that
+    // The value returned by newSnapshotPath and this agree
+    // The trick is dealing witht time, which won't be an eact match.
+    // But to be fair, that pretty much turns out to be a test
+    // of newSnapshot path because the S3 response on put doesn't
+    // actually return the path that it stored the item at.
+    assert.Equal(t, s.ArchiveBucket, resp.BucketName)
   }
 
+}
+
+func TestGetSnapshotList(t *testing.T) {
+  skipOnShort(t)
+  log.SetLevel(logrus.DebugLevel)
+  s := testServer(t, false)
+  snaps, err := GetSnapshotList(s.User, s.ArchiveBucket, s.AwsSession)
+  if assert.NoError(t, err) {
+    for _, snap := range snaps {
+      assert.Equal(t, s.User, userFromKey(snap.S3Object.Key))
+    }
+  }
 }

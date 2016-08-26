@@ -24,8 +24,7 @@ type PublishedArchiveResponse struct {
   PutObjectOutput *s3.PutObjectOutput
 }
 
-
-func ArchiveAndPublish(rcon *Rcon, serverDirectory, bucketName, publishPath string, config *aws.Config) (resp *PublishedArchiveResponse, err error) {
+func ArchiveAndPublish(rcon *Rcon, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
   archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
   archivePath := filepath.Join(archiveDir, archiveFileName)
@@ -34,24 +33,9 @@ func ArchiveAndPublish(rcon *Rcon, serverDirectory, bucketName, publishPath stri
 
   err = ArchiveServer(rcon, serverDirectory, archivePath)
   if err != nil { return nil, err }
-  resp, err = PublishArchive(archivePath, bucketName, publishPath, config)
+  resp, err = PublishArchive(archivePath, bucketName, publishPath, sess)
   return resp, err
 }
-
-// func ArchiveAndPublish(rcon *Rcon, serverDirectory string, bucketName string, user string, config *aws.Config) (resp *PublishedArchiveResponse, err error) {
-//   s := NewServer(user, "old-server", rcon.Host, rcon.Port, rcon.Password, bucketName, serverDirectory, config)
-//   resp, err = s.SnapshotAndPublish()
-//   // archiveDir := os.TempDir()
-//   // archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
-//   // archivePath := filepath.Join(archiveDir, archiveFileName)
-
-//   // log.Info(logrus.Fields{"user": user,"archiveDir": serverDirectory, "bucket": bucketName,}, "Creating Archive.")
-
-//   // err = ArchiveServer(rcon, serverDirectory, archivePath)
-//   // if err != nil { return nil, err }
-//   // resp, err = PublishArchive(archivePath, bucketName, user, config)
-//   return resp, err
-// }
 
 // Produce and archive of a server.
 // Use an rcon connection to first save-all, then save-off before the archive.
@@ -167,8 +151,8 @@ func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
 
 // Puts the archive in the provided bucket:path on S3 in a 'directory' for the user. Bucket must already exist.
 // Config must have keys and region.
-func PublishArchive(archiveFileName string, bucketName string, path string, config *aws.Config) (*PublishedArchiveResponse, error) {
-  s3svc := s3.New(session.New(config))
+func PublishArchive(archiveFileName string, bucketName string, path string, sess *session.Session) (*PublishedArchiveResponse, error) {
+  s3svc := s3.New(sess)
   file, err := os.Open(archiveFileName)
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't open archive file: %s", err)}
   defer file.Close()
@@ -183,7 +167,6 @@ func PublishArchive(archiveFileName string, bucketName string, path string, conf
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't read archive file: %s: %s", archiveFileName, err)}
   fileBytes := bytes.NewReader(buffer)
 
-  // path := getArchiveName(user)
   log.Debug(logrus.Fields{
     "archiveFile": archiveFileName, 
     "bytes": fileSize, 
@@ -194,8 +177,12 @@ func PublishArchive(archiveFileName string, bucketName string, path string, conf
   // TODO: Lookinto this and in particular figure out how to use an iamrole for this.
   aclString := "public-read"
 
+  // Gratuitous use of aws because of some
+  // issues with the compiler.
+  b := aws.String(bucketName)
+
   params := &s3.PutObjectInput{
-    Bucket: aws.String(bucketName),
+    Bucket: b,
     Key: aws.String(path),
     ACL: aws.String(aclString),
     Body: fileBytes,
@@ -215,11 +202,6 @@ func PublishArchive(archiveFileName string, bucketName string, path string, conf
   return returnResp, err
 }
 
-// TODO: Need to obscure this if we're going to make it publicly readable.
-func getArchiveName(user string) string {
-  timeString := time.Now().Format(time.RFC3339)
-  return user + "/archives/" + timeString + "-" + user + "-archive"
-}
 
 // Replace .. and absolute paths in archives.
 func sanitizedName(fileName string) string {
@@ -227,4 +209,5 @@ func sanitizedName(fileName string) string {
   fileName = strings.TrimLeft(fileName, "/.")
   return strings.Replace(fileName, "../", "", -1)
 }
+
 
