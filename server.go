@@ -68,15 +68,12 @@ func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration
     if len(s.RconPassword) == 0 {
       return nil, fmt.Errorf("No rcon password.")
     }
-    var rcon *Rcon
 
-  var rcon *Rcon
-  if !s.HasRconConnection() {
-    rcon, err = s.NewRconWithRetry(retries, waitTime)
-    s.Rcon = rcon
+    _, err = s.NewRconWithRetry(retries, waitTime)
+    if err != nil { return nil, err }
   }
 
-  resp, err = s.archiveAndPublish(rcon)
+  resp, err = s.archiveAndPublish(s.Rcon)
   return resp, err
 }
 
@@ -107,11 +104,11 @@ func (s *Server) RconPortString() (string) {
   return fmt.Sprintf("%d", s.RconPort)
 }
 
-func (s *Server) HasRconConnectinon() (bool) {
+func (s *Server) HasRconConnection() (bool) {
   if s.Rcon == nil {
     return false
   }
-  s.Rcon.HasConnection()
+  return s.Rcon.HasConnection()
 }
 
 func (s *Server) NoRcon() (bool) {
