@@ -73,6 +73,7 @@ func (rc *Rcon) HasConnection() bool {
 }
 
 func (rc *Rcon) Send(command string) (reply string, err error ) {
+  if rc == nil { return reply, fmt.Errorf("Rcon: Working from nil object. Probably should panic.")}
   if rc.Client == nil { return reply, fmt.Errorf("Rcon: Host connection client nil.")}
   reply, err = rc.Client.SendCommand(command)
   if err != nil { err = fmt.Errorf("Failed to send \"%s\" to server: %s", command, err)}

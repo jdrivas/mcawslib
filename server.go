@@ -94,12 +94,11 @@ func (s *Server) NewRcon() (rcon *Rcon, err error) {
 // will try up to retry times. Blocks until finished.
 func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
   rcon, err = NewRconWithRetry(s.ServerIp, s.RconPort, s.RconPassword, retries, waitTime)
-  if err != nil {
+  if err == nil {
     s.Rcon = rcon
   }
   return rcon, err
 }
-
 
 func (s *Server) HasRconConnection() (bool) {
   if s.Rcon == nil {
