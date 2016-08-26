@@ -58,20 +58,20 @@ func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err erro
   return resp, err
 }
 
-// Will keep trying to get the RCON connection, but sleeping for waitTime and then retrying, up to
-// retries times.
-// Will fail if the server doesn't have serverIp, rconPort, and rconPassword.
+// If we don't already have an RCON, will call NewRconWithRetry to get one.
 func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration) (resp *PublishedArchiveResponse, err error) {
 
-  if s.NoRcon() { 
-    return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.ServerIp, s.RconPort )
-  }
-  if len(s.RconPassword) == 0 {
-    return nil, fmt.Errorf("No rcon password.")
-  }
+  if !s.HasRconConnection() {
+    if s.NoRcon() { 
+      return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.ServerIp, s.RconPort )
+    }
+    if len(s.RconPassword) == 0 {
+      return nil, fmt.Errorf("No rcon password.")
+    }
+    var rcon *Rcon
 
   var rcon *Rcon
-  if !s.Rcon.HasConnection() {
+  if !s.HasRconConnection() {
     rcon, err = s.NewRconWithRetry(retries, waitTime)
     s.Rcon = rcon
   }
@@ -93,6 +93,8 @@ func (s *Server) NewRcon() (rcon *Rcon, err error) {
   return rcon, err
 }
 
+// Gets a new Rcon connection for the seever. Will retry after waitTime if the connection attempt fails,
+// will try up to retry times. Blocks until finished.
 func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
   rcon, err = NewRconWithRetry(s.ServerIp, s.RconPortString(), s.RconPassword, retries, waitTime)
   if err != nil {
@@ -103,6 +105,13 @@ func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rc
 
 func (s *Server) RconPortString() (string) {
   return fmt.Sprintf("%d", s.RconPort)
+}
+
+func (s *Server) HasRconConnectinon() (bool) {
+  if s.Rcon == nil {
+    return false
+  }
+  s.Rcon.HasConnection()
 }
 
 func (s *Server) NoRcon() (bool) {

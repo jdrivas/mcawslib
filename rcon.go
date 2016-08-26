@@ -19,9 +19,6 @@ type Rcon struct {
 
 // create a new connection.
 func NewRcon(host string, port string, pw string) (rcon *Rcon, err error) {
-  // I chose port string for the New funciton because mostly 
-  // If we're creating these on the fly, we're doing it from UI.
-  // Perhaps I'll regert this.
   p, err := strconv.Atoi(port)
   if err == nil {
     rcon = &Rcon{
