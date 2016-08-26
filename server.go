@@ -39,7 +39,7 @@ func NewServer(userName, serverName, serverIp string, rconPort string, rconPw, a
 
 // Will take snapshot of the server and publish it to the S3 bucket.
 // snapshots are stored
-//         bucket:/<Server.User>/snapshots/<time.Now()_ansi-time-string>-<Server.User>-<Server.Name>-snapshot.zip
+//         bucket:/<Server.User>/<Server.Name>/snapshots/<time.Now()_ansi-time-string>-<Server.User>-<Server.Name>-snapshot.zip
 // Zip files are used because that's the standard in minecraft land.
 // 
 // If serverIP or rconPort are not nil, then an rcon connection to 
@@ -124,5 +124,5 @@ const (
 
 func (s *Server)newSnapshotPath(when time.Time) (string) {
   timeString := when.Format(time.RFC3339)
-  return s.User + "/" + snapshotPathElement + "/" + timeString + "-" + s.User + "-" + s.Name + snapshotFileExt
+  return s.User + "/" + s.Name + "/" + snapshotPathElement + "/" + timeString + "-" + s.User + "-" + s.Name + snapshotFileExt
 }

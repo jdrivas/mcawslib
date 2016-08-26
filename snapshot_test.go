@@ -41,9 +41,9 @@ func TestNewSnapshotPath(t *testing.T) {
   now := time.Now()  
   timeElement := now.Format(time.RFC3339) + "-"
   serverElement := s.User + "-" + s.Name
-  // This should be: user/snapshots/<RFC3339TimeString>-<ServerUser>-<ServerName>-snapshot.zip
+  // This should be: <ServerUser>/<ServerName>/snapshots/<RFC3339TimeString>-<ServerUser>-<ServerName>-snapshot.zip
   // The snapshotPathELement and snapshotFielExt are private contstants in the library.
-  expectedValue := "testuser/" + snapshotPathElement + "/" + timeElement + serverElement + snapshotFileExt
+  expectedValue := s.User + "/" + s.Name + "/" + snapshotPathElement + "/" + timeElement + serverElement + snapshotFileExt
   testPath := s.newSnapshotPath(now)
 
   assert.Equal(t, expectedValue, testPath)
