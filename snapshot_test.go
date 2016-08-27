@@ -53,8 +53,12 @@ func TestGetSnapshotList(t *testing.T) {
   s := testServer(t, false)
   snaps, err := GetSnapshotList(s.User, s.ArchiveBucket, s.AwsSession)
   if assert.NoError(t, err) {
-    for _, snap := range snaps {
-      assert.Equal(t, s.User, userFromKey(snap.S3Object.Key))
+    for i, snap := range snaps {
+      key := snap.S3Object.Key
+      assert.Equal(t, s.User, userFromS3Key(key), 
+        "On try: %d %s, User name was different.", i+1, *key)
+      assert.Equal(t, ServerSnapshot, typeFromS3Key(key), 
+        "On try: %d %s, Type was not ServerSnapshot - was: %s", i+1, *key, typeFromS3Key(key))
     }
   }
 }

@@ -19,10 +19,11 @@ import(
 
 // I miss Ruby atoms.
 const (
-  ServerSnapshot = iota
-  World
+  ServerSnapshot ArchiveType = iota
+  World ArchiveType = iota
+  BadType ArchiveType = iota
 )
-var AllArchiveTypes = []ArchiveType{ServerSnapshot, World}
+var AllArchiveTypes = []ArchiveType{ServerSnapshot, World, BadType}
 type ArchiveType int
 
 func (a ArchiveType) String() (string) {
@@ -115,7 +116,6 @@ func (am ArchiveMap) GetArchives(userName string, t ArchiveType) (archiveList []
 }
 
 
-
 //
 // Maping to S3
 //
@@ -132,20 +132,28 @@ const S3Delim = "/"
 // this is the mapping.
 func newSnapshotPath(userName, serverName string, when time.Time) (string) {
   timeString := when.Format(time.RFC3339)
-  archiveName := timeString + "-" + userName + "-" + serverName + snapshotFileExt
   pathName := userName + S3Delim + serverName + S3Delim + snapshotPathElement
+  archiveName := timeString + "-" + userName + "-" + serverName + snapshotFileExt
 
   fullPath := pathName + S3Delim + archiveName
   return fullPath
-  // return userName + "/" + serverName + "/" + snapshotPathElement + "/" + archiveName
 }
 
-// TODO: THIS MUST CONTEMPLATE WORLDS too!
-func typeFromS3Key(key *string) (ArchiveType) {
-  return ServerSnapshot
+func typeFromS3Key(key *string) (t ArchiveType) {
+
+  keyElems := strings.Split(*key, S3Delim)
+  switch keyElems[2] {
+  case snapshotPathElement:
+    t = ServerSnapshot
+  case worldPathElement:
+    t = World
+  default: 
+    t = BadType
+  }
+  return t
 }
 
-func userFromKey(key *string) (string) {
+func userFromS3Key(key *string) (string) {
   return strings.Split(*key, S3Delim)[0]
 }
 
@@ -177,7 +185,7 @@ func getS3ArchivePrefixString(userName string) (string) {
 
 
 //
-// Functions to get archinves from S3.
+// Functions to get archives from S3.
 //
 
 // Blocks until finished.
