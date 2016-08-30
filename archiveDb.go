@@ -56,13 +56,26 @@ func NewArchive(t ArchiveType, userName, serverName string, bucketName string, o
   return a
 }
 
-func (a Archive) String() (string) {
-  key := ""
+func (a Archive) S3Key() (k string) {
   if a.S3Object == nil {
-    key = "NO-REFERENCE-TO-S3-OBJECT"
+    k = "NO-REFERENCE-TO-S3-OBJECT"
   } else {
-    key = *a.S3Object.Key
+    k = *a.S3Object.Key
   }
+  return k
+}
+
+func (a Archive) LastMod() (t string) {
+  if a.S3Object == nil {
+    t = "NO-TIME-AVAILABLE"
+  } else {
+    t = a.S3Object.LastModified.Local().Format(time.RFC1123)
+  }
+  return t
+}
+
+func (a Archive) String() (string) {
+  key := a.S3Key()
   return a.Type.String() + ":" + a.UserName + ":" + a.ServerName + ":[" + a.Bucket + "]/" + key
 }
 
@@ -118,7 +131,7 @@ func (am ArchiveMap) GetArchives(userName string, t ArchiveType) (archiveList []
 
 //
 // Maping to S3
-//
+// TODO: Move some of this to awslib.
 
 const (
   snapshotPathElement = "snapshots"
@@ -127,16 +140,62 @@ const (
   worldFileExt = "-world.zip"
 )
 
+var typeToPathElement = map[ArchiveType]string{
+  ServerSnapshot: snapshotPathElement,
+  World: worldPathElement,
+}
+
+var typeToFileExt = map[ArchiveType]string{
+  ServerSnapshot: snapshotFileExt,
+  World: worldFileExt,
+}
+
+
+// TODO: Move PathJoin to awslib
 const S3Delim = "/"
+func S3PathJoin(elems ...string ) string {
+  s := ""
+  for _, e := range elems {
+    e = strings.TrimRight(e, S3Delim) // lose all trailing delims
+    s += e + S3Delim
+  }
+  return s
+}
 
-// this is the mapping.
-func newSnapshotPath(userName, serverName string, when time.Time) (string) {
-  timeString := when.Format(time.RFC3339)
-  pathName := userName + S3Delim + serverName + S3Delim + snapshotPathElement
-  archiveName := timeString + "-" + userName + "-" + serverName + snapshotFileExt
+const S3BaseURI = "https://s3.amazonaws.com"
+// Full qualified URI for a snapshot given the arguments.
 
-  fullPath := pathName + S3Delim + archiveName
+func SnapshotURI(bucket, userName, serverName, snapshotFileName string) (string) {
+  path := archivePath(userName, serverName, ServerSnapshot)
+  return S3PathJoin(S3BaseURI, bucket, path) + snapshotFileName
+}
+
+
+func NewSnapshotPath(userName, serverName string, when time.Time) (string) {
+  return newArchivePath(userName, serverName, when, ServerSnapshot)
+}
+
+func newArchivePath(userName, serverName string, when time.Time, aType ArchiveType) (string) {
+  pathName := archivePath(userName, serverName, aType)
+  archiveName := archiveFileName(userName, serverName, when, aType)
+  fullPath := pathName + archiveName
   return fullPath
+}
+
+
+// Make the path for an archive based on the constituate values.
+// This is the mapping definition (see archiveDb_test)
+// <user>/<server>/<archive-type-string>
+func archivePath(user, server string, aType ArchiveType) (string) {
+  s := S3PathJoin(user, server, typeToPathElement[aType])
+  return s
+}
+
+
+// the files names are: <time>-<user>-<server>-<archiveExt>
+func archiveFileName(user, server string, when time.Time, aType ArchiveType) (string) {
+  timeString := when.Format(time.RFC3339)
+  return timeString + "-" + user + "-" + server + typeToFileExt[aType]
 }
 
 func typeFromS3Key(key *string) (t ArchiveType) {
@@ -190,6 +249,9 @@ func getS3ArchivePrefixString(userName string) (string) {
 
 // Blocks until finished.
 func GetArchives(userName, bucketName string, session *session.Session) (archives ArchiveMap, err error) {
+  // TODO: move this to awslib.
+  // GetObjectList(string bucketName, preFix) ([]*s3.Object)
+  // You might consider returning a map of ([string]*s3.Object), keyed on  the storage key.
   s3Svc := s3.New(session)
   archives = NewArchiveMap()
   params := &s3.ListObjectsV2Input{

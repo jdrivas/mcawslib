@@ -11,6 +11,14 @@ import (
   "github.com/stretchr/testify/assert"
 )
 
+func init() {
+  // If you want to repeat a test run with the same values over
+  // and over again, just remove this ... or you can give it 
+  // a value that you keep using over again.
+  rand.Seed(time.Now().UnixNano())
+}
+
+
 func skipOnShort(t *testing.T) {
   if testing.Short() { t.SkipNow() }
 }
@@ -59,14 +67,21 @@ func testS3Object(key string) (o *s3.Object) {
   return o
 }
 
+
 var(
   users = []string{ "Nico", "Pilar", "Elena", "Stephanie", "Josh", "Panda", "Daddy", "jdrivas", }
+  servers = []string{ "Test-Server", "Production-Server", "Staging-Server","FrodServer", "CrazyServer", "CraftyServer", }
 )
 
-func randName() (string) {
+func randUserName() (string) {
   // i := rand.Int() % len(users)
   return users[rand.Int() % len(users)]
 }
+
+func randServerName() (string) {
+  return servers[rand.Int() % len(servers)]
+}
+
 
 func randomUniqueUserNames(numOfUsers int) (names []string){
   // testNum := (numOfUsers / len(users)) + 1
@@ -74,9 +89,9 @@ func randomUniqueUserNames(numOfUsers int) (names []string){
   nameSet := make(map[string]bool)
   for i := 0; i < numOfUsers; i++ {
     if numOfUsers > len(users) {
-      rn := randName()
+      rn := randUserName()
       for nameSet[rn] {
-        rn = randName()
+        rn = randUserName()
         for nameSet[rn] {
           userNumber := rand.Int() & (numOfUsers + 1)
           rn = rn + fmt.Sprintf("-%d", userNumber)
@@ -85,13 +100,16 @@ func randomUniqueUserNames(numOfUsers int) (names []string){
       names[i] = rn
       nameSet[rn] = true
     } else {
-      rn := randName()
-      for nameSet[rn] { rn = randName() }
+      rn := randUserName()
+      for nameSet[rn] { rn = randUserName() }
       names[i] = rn
     }
   }
   return names
 }
+
+
+
 
 func TestRandomUniqueUsers(t *testing.T) {
   count := 100

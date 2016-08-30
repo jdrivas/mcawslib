@@ -118,6 +118,6 @@ func (s *Server) GoodRcon() (bool) {
 }
 
 func (s *Server) newSnapshotPath(when time.Time) (string) {
-  return newSnapshotPath(s.User, s.Name, when)
+  return NewSnapshotPath(s.User, s.Name, when)
 }
 
