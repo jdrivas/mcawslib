@@ -152,6 +152,10 @@ func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
 // Puts the archive in the provided bucket:path on S3 in a 'directory' for the user. Bucket must already exist.
 // Config must have keys and region.
 func PublishArchive(archiveFileName string, bucketName string, path string, sess *session.Session) (*PublishedArchiveResponse, error) {
+  // TODO: it may be good to remove this, but as we were having trouble wiht
+  // sessions for a minute there, the resultingpanic wasn't helping, though it's
+  // probably the right behavior.
+  if sess == nil {return nil, fmt.Errorf("mclib#PublishArchive can't have a nil session.Session")}
   s3svc := s3.New(sess)
   file, err := os.Open(archiveFileName)
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't open archive file: %s", err)}
