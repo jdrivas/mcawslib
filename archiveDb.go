@@ -79,6 +79,26 @@ func (a Archive) String() (string) {
   return a.Type.String() + ":" + a.UserName + ":" + a.ServerName + ":[" + a.Bucket + "]/" + key
 }
 
+type ByLastMod []Archive
+func (a ByLastMod) Len() int { return len(a) }
+func (a ByLastMod) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod() < a[j].LastMod()}
+
+type ByUser []Archive
+func (a ByUser) Len() int { return len(a) }
+func (a ByUser) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByUser) Less(i, j int) bool { return a[i].UserName < a[j].UserName}
+
+type ByType []Archive
+func (a ByType) Len() int { return len(a) }
+func (a ByType) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByType) Less(i, j int) bool { return a[i].Type < a[j].Type}
+
+type ByBucket []Archive
+func (a ByBucket) Len() int { return len(a) }
+func (a ByBucket) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByBucket) Less(i, j int) bool { return a[i].Bucket < a[j].Bucket}
+
 
 // 
 // ArchiveMap
