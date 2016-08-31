@@ -79,6 +79,8 @@ func (a Archive) String() (string) {
   return a.Type.String() + ":" + a.UserName + ":" + a.ServerName + ":[" + a.Bucket + "]/" + key
 }
 
+
+// Soring Interface
 type ByLastMod []Archive
 func (a ByLastMod) Len() int { return len(a) }
 func (a ByLastMod) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
