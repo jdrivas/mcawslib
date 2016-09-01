@@ -51,7 +51,7 @@ func TestGetSnapshotList(t *testing.T) {
   skipOnShort(t)
   log.SetLevel(logrus.DebugLevel)
   s := testServer(t, false)
-  snaps, err := GetSnapshotList(s.User, s.ArchiveBucket, s.AwsSession)
+  snaps, err := GetSnapshotList(s.User, s.ArchiveBucket, s.AWSSession)
   if assert.NoError(t, err) {
     for i, snap := range snaps {
       key := snap.S3Object.Key
