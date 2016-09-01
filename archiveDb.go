@@ -65,11 +65,9 @@ func (a Archive) S3Key() (k string) {
   return k
 }
 
-func (a Archive) LastMod() (t string) {
-  if a.S3Object == nil {
-    t = "NO-TIME-AVAILABLE"
-  } else {
-    t = a.S3Object.LastModified.Local().Format(time.RFC1123)
+func (a Archive) LastMod() (t time.Time) {
+  if a.S3Object != nil {
+    t = a.S3Object.LastModified.Local()
   }
   return t
 }
@@ -84,7 +82,7 @@ func (a Archive) String() (string) {
 type ByLastMod []Archive
 func (a ByLastMod) Len() int { return len(a) }
 func (a ByLastMod) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod() < a[j].LastMod()}
+func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod().Before(a[j].LastMod())}
 
 type ByUser []Archive
 func (a ByUser) Len() int { return len(a) }
