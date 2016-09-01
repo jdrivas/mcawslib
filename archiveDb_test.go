@@ -98,7 +98,7 @@ func TestGetSnapshots (t *testing.T) {
     _, ok := userSet[un]
     if !ok {userSet[un] = true} // track how many unique users we added to the map.
     sn := fmt.Sprintf("%s-TestServer",un )
-    s := NewServer(un, sn, "127.0.0.1", "25575", "secret", "test-bucket", "server", sess)
+    s := NewServer(un, sn, "127.0.0.1", 25565, "25575", "secret", "test-bucket", "server", sess)
     t := getRandomArchiveType()
     if t == ServerSnapshot && un == user {snapCount++}
     path := s.newSnapshotPath(time.Now())

@@ -14,7 +14,6 @@ import(
 
 )
 
-
 // TODO: Likely to want to pull out the AWS 
 // into a separate abstration. But for now
 // I'm weded to this.
@@ -22,6 +21,7 @@ type Server struct {
   User string
   Name string
   ServerIp string
+  ServerPort int64
 
   RconPort string
   RconPassword string
@@ -34,12 +34,13 @@ type Server struct {
   AWSSession *session.Session
 }
 
-func NewServer(userName, serverName, serverIp, rconPort, rconPw, 
+func NewServer(userName, serverName, serverIp string, serverPort int64,  rconPort, rconPw, 
   archiveBucket, serverDirectory string, sess *session.Session) (s *Server) {
   s = new(Server)
   s.User = userName
   s.Name = serverName
   s.ServerIp = serverIp
+  s.ServerPort = serverPort
   s.RconPort = rconPort
   s.RconPassword = rconPw
   s.ArchiveBucket = archiveBucket
@@ -151,11 +152,16 @@ func GetServer(clusterName, taskArn string, sess *session.Session) (a *Server, e
   userName := serverEnv[ServerUserKey]
   serverName := serverEnv[ServerNameKey]
   serverIp := dt.PublicIpAddress()
+  serverPort, ok := dt.PortHostBinding(MinecraftServerContainerName, ServerPortDefault)
+  if !ok {
+    serverPort = 0
+    log.Error(nil, "Couldn't get server port.", fmt.Errorf("Couldn't get server port."))
+  }
   rconPort := serverEnv[RconPortKey]
   rconPW := serverEnv[RconPasswordKey]
   archiveBucket := controllerEnv[ArchiveBucketKey]
   serverDirectory := controllerEnv[ServerLocationKey]
-  a = NewServer(userName, serverName, serverIp, 
+  a = NewServer(userName, serverName, serverIp, serverPort,
     rconPort, rconPW, archiveBucket, serverDirectory, sess)
   return a, err
 }

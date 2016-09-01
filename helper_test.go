@@ -49,10 +49,10 @@ func testConfig(t *testing.T) (config *aws.Config){
 func testServer(t *testing.T, useRcon bool) (s *Server) {
   sess := testSession(t)
   if useRcon {
-    s = NewServer("testuser", "TestServer", "192.168.99.100", "25575", "testing", 
+    s = NewServer("testuser", "TestServer", "192.168.99.100", 25565, "25575", "testing", 
       "craft-config-test", "server", sess)
   } else {
-    s = NewServer("testuser", "TestServer", "", "0", "", 
+    s = NewServer("testuser", "TestServer", "", 0, "0", "", 
       "craft-config-test", "server", sess)
   }
   return s
