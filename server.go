@@ -139,6 +139,9 @@ const (
 
   JVMOptsKey = "JVM_OPTS"
   JVMOptsDefault = "-Xmx1024M -Xms1024M"
+
+  //TODO:  There is no default for now.
+  WorldKey = "WORLD"
 )
 
 
