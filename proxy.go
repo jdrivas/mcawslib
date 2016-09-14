@@ -4,8 +4,6 @@ import(
   "fmt"
   "github.com/aws/aws-sdk-go/aws/session"
 
-  "github.com/jdrivas/mclib"
-
   // "awslib"
   "github.com/jdrivas/awslib"
 )
@@ -68,8 +66,8 @@ func GetProxy(clusterName, taskArn string, sess *session.Session) (*Proxy, error
   }
 
   proxy := NewProxy(
-    proxyEnv[mclib.ServerNameKey], dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
-    proxyEnv[mclib.RconPasswordKey], proxyPort, rconPort, sess)
+    proxyEnv[ServerNameKey], dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
+    proxyEnv[RconPasswordKey], proxyPort, rconPort, sess)
 
   return proxy, nil
 }
