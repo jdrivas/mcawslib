@@ -6,8 +6,8 @@ import(
 
   "github.com/jdrivas/mclib"
 
-  "awslib"
-  // "github.com/jdrivas/awslib"
+  // "awslib"
+  "github.com/jdrivas/awslib"
 )
 
 
