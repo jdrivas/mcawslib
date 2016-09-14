@@ -1,0 +1,153 @@
+{
+  "family": "bungee-test",
+  "volumes": [],
+  "networkMode": "bridge",
+  "taskRoleArn": null,
+  "containerDefinitions": [
+    {
+      "name": "minecraft-hub",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "essential": true,
+      "cpu": 256,
+      "memory": 1024,
+      "memoryReservation": 512,
+      "ulimits": null,
+      "portMappings": [],
+      "hostname": null,
+      "entryPoint": null,
+      "command": null,
+      "user": null,
+      "workingDirectory": null,
+      "environment": [
+        { "name": "ENABLE_QUERY", "value": "TRUE" },
+        { "name": "ENABLE_RCON", "value": "true" },
+        { "name": "EULA", "value": "TRUE" },
+        { "name": "FORCE_GAMEMODE", "value": "true" },
+        { "name": "MODE", "value": "creative" },
+        { "name": "MOTD", "value": "A minecraft hub" },
+        { "name": "ONLINE_MODE", "value": "false" },
+        { "name": "OPS", "value": "jdrivas" },
+        { "name": "QUERY_PORT", "value": "25565" },
+        { "name": "RCON_PASSWORD", "value": "testing" },
+        { "name": "RCON_PORT", "value": "25575" },
+        { "name": "TYPE", "value": "SPIGOT" }
+      ],
+      "dockerLabels": {
+        "service": "minecraft-hub"
+      },
+      "links": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "readonlyRootFilesystem": null,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "minecraft-server",
+          "awslogs-region": "us-east-1"
+        }
+      },
+      "dockerSecurityOptions": null,
+      "privileged": null,
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null
+    },
+    {
+      "name": "minecraft-control",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "essential": false,
+      "cpu": 128,
+      "memory": 512,
+      "memoryReservation": 128,
+      "ulimits": null,
+      "portMappings": [],
+      "hostname": null,
+      "entryPoint": [
+        "craft-config",
+        "--debug",
+        "archive",
+        "--continuous",
+        "--server-ip=minecraft-hub",
+        "--rcon-retries=-1"
+      ],
+      "command": null,
+      "user": null,
+      "workingDirectory": "/data",
+      "environment": [],
+      "dockerLabels": null,
+      "links": [
+        "minecraft-hub",
+        "bungee"
+      ],
+      "mountPoints": [],
+      "volumesFrom": [
+        {
+          "readOnly": null,
+          "sourceContainer": "minecraft-hub"
+        }
+      ],
+      "readonlyRootFilesystem": null,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "minecraft-monitor",
+          "awslogs-region": "us-east-1"
+        }
+      },
+      "dockerSecurityOptions": null,
+      "privileged": null,
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null
+    },
+    {
+      "name": "bungee",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/bungee-ecs",
+      "essential": true,
+      "cpu": 128,
+      "memory": 1024,
+      "memoryReservation": 512,
+      "ulimits": null,
+      "portMappings": [
+        {
+          "hostPort": 25577,
+          "containerPort": 25577,
+          "protocol": "tcp"
+        },
+        {
+          "hostPort": 25575,
+          "containerPort": 25575,
+          "protocol": "tcp"
+        }
+      ],
+      "hostname": null,
+      "entryPoint": null,
+      "command": null,
+      "user": null,
+      "workingDirectory": null,
+      "environment": [],
+      "dockerLabels": null,
+      "links": [
+        "minecraft-hub"
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "readonlyRootFilesystem": null,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "minecraft-bungee",
+          "awslogs-region": "us-east-1"
+        }
+      },
+      "dockerSecurityOptions": null,
+      "privileged": null,
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null
+    }
+  ]
+}
