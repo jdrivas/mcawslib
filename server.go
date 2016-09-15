@@ -207,8 +207,14 @@ func GetServer(clusterName, taskArn string, sess *session.Session) (a *Server, e
   dtm, err := awslib.GetDeepTasks(clusterName, sess)
   if err != nil { return a, fmt.Errorf("Failed to get Server information: %s", err) }
   dt := dtm[taskArn]
-  serverEnv, err := dt.GetEnvironment(MinecraftServerContainerName)
-  controllerEnv, err := dt.GetEnvironment(MinecraftControllerContainerName)
+  serverEnv, ok := dt.GetEnvironment(MinecraftServerContainerName)
+  if !ok {
+    return nil, fmt.Errorf("Couldn't find a container for %s.", MinecraftServerContainerName)
+  }
+  controllerEnv, ok := dt.GetEnvironment(MinecraftControllerContainerName)
+  if !ok {
+    return nil, fmt.Errorf("Couldn't find a container for %s.", MinecraftControllerContainerName)
+  }
   userName := serverEnv[ServerUserKey]
   serverName := serverEnv[ServerNameKey]
   serverIp := dt.PublicIpAddress()

@@ -52,24 +52,67 @@ func NewProxy(name, publicIp, privateIp, taskArn, rconPw string,
   return p
 }
 
-func GetProxy(clusterName, taskArn string, sess *session.Session) (*Proxy, error) {
+// This is a convenience for getting basic proxy information as well as all the data associated
+// with a task running a Proxy. Many times you can choose to ignore the dtm returned. But equally,
+// you may want all that data, rather than getting all the proxies then doing another DTM call
+// since we need that information to get the list of proxies, we return it here.
+func GetProxies(clusterName string, sess *session.Session) (p []*Proxy, dtm awslib.DeepTaskMap, err error) {
+
+  p = make([]*Proxy, 0)
+  dtm, err = awslib.GetDeepTasks(clusterName, sess)
+  if err != nil { return p, dtm, err }
+
+  for arn, dt := range dtm {
+    proxy, ok := GetProxyFromTask(dt, arn, sess)
+    if ok {
+      p = append(p, proxy)
+    }
+  }
+
+  return p, dtm, err
+}
+
+// Checks all of the conatiners for one who has an env with
+// env[RoleKey] == CraftProxyRole.
+// TODO: There are certainly faster ways of doing this, but for the moment.
+// this seems like the most robust in the face of change and given the tools
+// avaialble. In particular it would be better if I could meta-tag containers
+// and tasks, but AWS seems to only keep the Docker Labels on the TaskDefinition.
+// Or I could just look for the Environment for BungeeProxyServerContainerName.
+// If it's there, then I'm done ..... hnmmmm.
+// func isProxy(dt *awslib.DeepTask) (bool) {
+//   _, ok := dt.GetEnvironment(BungeeProxyServerContainerName)
+//   return ok
+// }
+
+func GetProxy(clusterName, taskArn string, sess *session.Session) (p *Proxy, err error) {
   dt, err := awslib.GetDeepTask(clusterName, taskArn, sess)
-  if err != nil { return nil, err }
-  proxyEnv, err := dt.GetEnvironment(BungeeProxyServerContainerName)
-  proxyPort := int64(0)
-  if p, ok := dt.PortHostBinding(BungeeProxyServerContainerName, ProxyPortDefault); ok {
-    proxyPort = p
+  var ok bool
+  if err == nil {
+    p, ok = GetProxyFromTask(dt, taskArn, sess)
+    if !ok { err = fmt.Errorf("This task does not appear to be a proxy: %s", taskArn) }
   }
-  rconPort := int64(0)
-  if p, ok := dt.PortHostBinding(BungeeProxyServerContainerName, RconPortDefault); ok {
-    rconPort = p
+  return p, err
+}
+
+func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session) (p *Proxy, ok bool) {
+  proxyEnv, ok := dt.GetEnvironment(BungeeProxyServerContainerName)
+  if ok {
+    proxyPort := int64(0)
+    if port, ok := dt.PortHostBinding(BungeeProxyServerContainerName, ProxyPortDefault); ok {
+      proxyPort = port
+    }
+    rconPort := int64(0)
+    if port, ok := dt.PortHostBinding(BungeeProxyServerContainerName, RconPortDefault); ok {
+      rconPort = port
+    }
+
+    p = NewProxy(
+      proxyEnv[ServerNameKey], dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
+      proxyEnv[RconPasswordKey], proxyPort, rconPort, sess)
   }
 
-  proxy := NewProxy(
-    proxyEnv[ServerNameKey], dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
-    proxyEnv[RconPasswordKey], proxyPort, rconPort, sess)
-
-  return proxy, nil
+  return p, ok
 }
 
 func (p *Proxy) PublicIpAddress() (string) {
@@ -79,7 +122,6 @@ func (p *Proxy) PublicIpAddress() (string) {
 func (p *Proxy) RconAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PrivateProxyIp, p.RconPort)
 }
-
 
 
 // func GetProxyFromTask(dt *awslib.DeepTask, sess *session.Session) (*Proxy) {
