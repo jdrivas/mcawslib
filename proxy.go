@@ -3,18 +3,18 @@ package mclib
 import(
   "fmt"
   "github.com/aws/aws-sdk-go/aws/session"
+  "github.com/aws/aws-sdk-go/service/route53"
 
   // "awslib"
   "github.com/jdrivas/awslib"
 )
 
 
-
 // TODO: Is there state that we need to save on the 
 // Proxy? Probably as we addd plugins.
 type Proxy struct {
   Name string
-
+  ClusterName string
   // TODO: Let's wait on adding a point to the hub server directly.
   // You can find it if you need it.
   // Hub *Server
@@ -36,11 +36,12 @@ const (
   BungeeProxyHubControllerContainerName = "minecraft-control"
 )
 
-func NewProxy(name, publicIp, privateIp, taskArn, rconPw string,
+func NewProxy(name, clusterName, publicIp, privateIp, taskArn, rconPw string,
   proxyPort, rconPort int64, sess *session.Session ) (p *Proxy) {
 
   p = new(Proxy)
   p.Name = name
+  p.ClusterName = clusterName
   p.PublicProxyIp = publicIp
   p.PrivateProxyIp = privateIp
   p.ProxyPort = proxyPort
@@ -95,6 +96,22 @@ func GetProxy(clusterName, taskArn string, sess *session.Session) (p *Proxy, err
   return p, err
 }
 
+func GetProxyByName(clusterName, proxyName string, sess *session.Session) (p *Proxy, err error) {
+  proxies, _, err := GetProxies(clusterName, sess)
+  if err == nil {
+    for _, proxy := range proxies {
+      if proxy.Name == proxyName {
+        p = proxy
+        break
+      }
+    }
+  }
+  return p, err
+}
+
+// TODO: THIS IS IMPORTANT. We need to check the DNS to see if we're currently attached to tne 
+// network or not.  Suggested updates include: add a new field to the Proxy struct which is the
+// actual DNS address for this proxy and have this function AND ONLY this function fill it out.
 func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session) (p *Proxy, ok bool) {
   proxyEnv, ok := dt.GetEnvironment(BungeeProxyServerContainerName)
   if ok {
@@ -108,7 +125,7 @@ func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session
     }
 
     p = NewProxy(
-      proxyEnv[ServerNameKey], dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
+      proxyEnv[ServerNameKey], dt.ClusterName(), dt.PublicIpAddress(), dt.PrivateIpAddress(), taskArn,
       proxyEnv[RconPasswordKey], proxyPort, rconPort, sess)
   }
 
@@ -123,7 +140,50 @@ func (p *Proxy) RconAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PrivateProxyIp, p.RconPort)
 }
 
+func (p *Proxy) GetDomainName() (dn string) {
+  // dn = p.Name + ".hood.momentlabs.io"
+  dn = p.Name + ".momentlabs.io"
+  return dn
+}
 
-// func GetProxyFromTask(dt *awslib.DeepTask, sess *session.Session) (*Proxy) {
-  // 
+// This can be a little expensive. It makes 4 calls to AWS.
+func (p *Proxy) GetDeepTask() (dt *awslib.DeepTask, err error) {
+  return awslib.GetDeepTask(p.ClusterName, p.TaskArn, p.AWSSession)
+}
+
+// Associate with a possibly new ElasticIP address and publish 
+// (or reuse) a DNS entry for this proxy.
+// type AttachNetworkResp struct {
+//   EIPStatus *ec2.AllocateAddressOutput // AllocationId *string, Domain *string, PublicIp *string
+//   DNSStatus *route53.ChangeInfo // Comment *string, Id *string, Status *string, SubmittedAt *time.Time
+//   AssocId *string // association id for the EIP to Instance association.
+//   DNSAddress string
 // }
+
+// This should probably be longer ......
+const DefaultProxyTTL int64 = 60
+
+// Grab an IP then push it to DNS and attach to the instance.
+// Actually I don't really need the EIP .... Just an attach.
+func (p *Proxy) AttachToNetwork() (domainName string, changeInfo *route53.ChangeInfo, err error) {
+
+  // eipResp, err := awslib.GetNewEIP(p.AWSSession)
+  // if err != nil { return anr, err }
+  // anr.EIPStatus = eipResp
+
+  domainName = p.GetDomainName()
+  comment := fmt.Sprintf("Attaching proxy: %s to network at: %s\n", domainName, p.PublicProxyIp)
+  changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, domainName, comment, DefaultProxyTTL ,p.AWSSession)
+  if err != nil { return domainName, changeInfo, err }
+
+  return domainName, changeInfo, err
+}
+
+
+
+
+
+
+
+
+
