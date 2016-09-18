@@ -261,12 +261,15 @@ func GetServerFromTask(dt *awslib.DeepTask, sess *session.Session) (s *Server, o
   serverEnv, ok := getServerEnv(dt)
   controllerEnv, _ := getControllerEnv(dt)
   if ok {
+
+    sc, ok := getContainerFromNames(GetServerContainerNames(), dt)
+    if !ok { return nil, false }
     serverPort := Port(0)
-    if port, ok := dt.PortHostBinding(MinecraftServerContainerName, ServerPortDefault); ok {
+    if port, ok := dt.PortHostBinding(*sc.Name, ServerPortDefault); ok {
       serverPort = Port(port)
     }
     rconPort := Port(0)
-    if port, ok := dt.PortHostBinding(MinecraftControllerContainerName, RconPortDefault); ok {
+    if port, ok := dt.PortHostBinding(*sc.Name, RconPortDefault); ok {
       rconPort = Port(port)
     }
     s = &Server{
