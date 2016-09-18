@@ -91,14 +91,13 @@ func TestGetSnapshots (t *testing.T) {
   userSet := make(map[string]bool)
   users := randomUniqueUserNames(numUniqueUsers)
   user := users[rand.Int() % numUniqueUsers]
-  sess := testSession(t)
   archiveMap := make(ArchiveMap, iters)
   for i := 1; i < iters; i++ {
     un := users[rand.Int() % len(users)]
     _, ok := userSet[un]
     if !ok {userSet[un] = true} // track how many unique users we added to the map.
     sn := fmt.Sprintf("%s-TestServer",un )
-    s := NewServer(un, sn, "127.0.0.1", 25565, "25575", "secret", "test-bucket", "server", sess)
+    s := testServer(t, true)
     t := getRandomArchiveType()
     if t == ServerSnapshot && un == user {snapCount++}
     path := s.newSnapshotPath(time.Now())

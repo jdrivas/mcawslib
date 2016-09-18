@@ -46,14 +46,27 @@ func testConfig(t *testing.T) (config *aws.Config){
   return config
 }
 
+var taskArn = "server"
+var server = &Server{
+    User: "testuser", 
+    Name: "TestServer", 
+    PublicServerIp: "192.168.99.100", 
+    ServerPort: 25565, 
+    RconPort: 25575, 
+    RconPassword: "testing",
+    ArchiveBucket: "craft-config-test", 
+    TaskArn: &taskArn,
+}
+
 func testServer(t *testing.T, useRcon bool) (s *Server) {
   sess := testSession(t)
-  if useRcon {
-    s = NewServer("testuser", "TestServer", "192.168.99.100", 25565, "25575", "testing", 
-      "craft-config-test", "server", sess)
-  } else {
-    s = NewServer("testuser", "TestServer", "", 0, "0", "", 
-      "craft-config-test", "server", sess)
+  s = server
+  s.AWSSession = sess
+  if !useRcon {
+    s.PublicServerIp = ""
+    s.ServerPort = 0
+    s.RconPort = 0
+    s.RconPassword = ""
   }
   return s
 }

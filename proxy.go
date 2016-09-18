@@ -30,10 +30,23 @@ type Proxy struct {
   AWSSession *session.Session
 }
 
+// These are critical constants to the behavior of
+// the system, specifically ecs-craft and the task-definitions
+// all rely on using these names correctly.
 const (
+  DefaultProxyTaskDefinition = BungeeProxyRandomPortTaskDef
   BungeeProxyServerContainerName = "bungee"
   BungeeProxyHubServerContainerName = "minecraft-hub"
   BungeeProxyHubControllerContainerName = "minecraft-control"
+)
+// These task-definitions are built from the corresponding
+// task definitions in go/src/mclib/task-definitions.
+// They use the variables defined above. 
+// There is currently no auto-generation of these configs
+// and so they are kept in sync by hand!
+const(  
+  BungeeProxyDefaultPortTaskDef = "bungee-default"
+  BungeeProxyRandomPortTaskDef = "bungee-random"
 )
 
 func NewProxy(name, clusterName, publicIp, privateIp, taskArn, rconPw string,
@@ -109,9 +122,16 @@ func GetProxyByName(clusterName, proxyName string, sess *session.Session) (p *Pr
   return p, err
 }
 
-// TODO: THIS IS IMPORTANT. We need to check the DNS to see if we're currently attached to tne 
-// network or not.  Suggested updates include: add a new field to the Proxy struct which is the
-// actual DNS address for this proxy and have this function AND ONLY this function fill it out.
+// TODO: THIS IS IMPORTANT. We need to check the DNS to see if we're 
+// currently attached to tne network or not.  Suggested updates 
+// include: add a new field to the Proxy struct which is the
+// actual DNS address for this proxy and have this function AND 
+// ONLY this function fill it out.
+//
+// TODO: THIS IS IMPORTANT. We are currently equating wether a task is a proxy task
+// by virtue of it having a container with the proxy name. This may not be the best
+// thing. On the other hand I haven't got anything better yet.
+// We are using the ROLE environment variable that we might want to check as well .....
 func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session) (p *Proxy, ok bool) {
   proxyEnv, ok := dt.GetEnvironment(BungeeProxyServerContainerName)
   if ok {
@@ -142,7 +162,7 @@ func (p *Proxy) RconAddress() (string) {
 
 func (p *Proxy) GetDomainName() (dn string) {
   // dn = p.Name + ".hood.momentlabs.io"
-  dn = p.Name + ".momentlabs.io"
+  dn = p.Name + ".hoods.momentlabs.io"
   return dn
 }
 

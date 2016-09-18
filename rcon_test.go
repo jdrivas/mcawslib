@@ -9,7 +9,7 @@ import (
 func TestNewRcon(t *testing.T) {
   skipOnShort(t)
   s := testServer(t, true)
-  assert.NotEqual(t, "", s.ServerIp, "Server IP was not set.")
+  assert.NotEqual(t, "", s.PublicServerIp, "Server IP was not set.")
   assert.NotEqual(t, "", s.RconPort, "RconPort was not set.")
   assert.True(t, s.GoodRcon(), "Server Rcon was not good.")
 
@@ -27,7 +27,7 @@ func TestNewRcon(t *testing.T) {
 func TestNewRconWithRety(t *testing.T) {
   skipOnShort(t)
   s := testServer(t, true)
-  assert.NotEqual(t, "", s.ServerIp, "Server IP was not set.")
+  assert.NotEqual(t, "", s.PublicServerIp, "Server IP was not set.")
   assert.NotEqual(t, "", s.RconPort, "RconPort was not set.")
   assert.True(t, s.GoodRcon(), "Server Rcon was not good.")
 

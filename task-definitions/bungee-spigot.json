@@ -12,6 +12,7 @@
       "memoryReservation": 1024,
       "cpu": 256,
       "environment": [
+        { "name": "CONTAINER_ROLE", "value": "CraftServer"},
         { "name": "EULA", "value": "true" },
         { "name": "TYPE", "value": "spigot" },
         { "name": "ONLINE_MODE", "value": "false" },
@@ -70,12 +71,12 @@
       "memory": 500,
       "cpu": 128,
       "environment": [
-        {          
-          "name": "SERVER_USER", "value": "testuser",
-          "name": "SERVER_NAME", "value": "spigot-test",
-          "name": "ARCHIVE_BUCKET", "value": "craft-config-test",
-          "name": "AWS_REGION", "value": "us-east-1"
-        }],
+          { "name": "CONTAINER_ROLE", "value": "CraftController" },
+          { "name": "SERVER_USER", "value": "testuser" },
+          { "name": "SERVER_NAME", "value": "spigot-test" },
+          { "name": "ARCHIVE_BUCKET", "value": "craft-config-test" },
+          { "name": "AWS_REGION", "value": "us-east-1" }
+      ],
       "entryPoint": [
         "craft-config",
         "--debug",
