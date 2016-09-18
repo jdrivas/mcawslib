@@ -12,7 +12,13 @@
       "memory": 1024,
       "memoryReservation": 512,
       "ulimits": null,
-      "portMappings": [],
+      "portMappings": [
+       {
+          "hostPort": 0,
+          "containerPort": 25575,
+          "protocol": "tcp"
+        }
+      ],
       "hostname": null,
       "entryPoint": null,
       "command": null,
