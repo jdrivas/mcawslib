@@ -185,6 +185,11 @@ func (p Port) String() (string) {
   return strconv.FormatInt(int64(p), 10)
 }
 
+func NewPort(ps string) (Port, error) {
+  p, err := strconv.ParseInt(ps, 10, 64)
+  return Port(p), err
+}
+
 // TODO: Likely to want to pull out the AWS 
 // into a separate abstration. But for now
 // I'm weded to this.
@@ -399,98 +404,5 @@ func (s *Server) CraftType() (string) {
   serverType, ok := env[TypeKey]
   if !ok { serverType = "Vanila" }
   return serverType
-}
-
-// Will take snapshot of the server and publish it to the S3 bucket.
-// snapshots are stored
-//         bucket:/<Server.User>/<Server.Name>/snapshots/<time.Now()_ansi-time-string>-<Server.User>-<Server.Name>-snapshot.zip
-// Zip files are used because that's the standard in minecraft land.
-// 
-// If serverIP or rconPort are not nil, then an rcon connection to 
-// the server will be made to issue save-all then save-off before
-// the snapshot is taken and save-on after once the snapshot has
-// been ade but before it's been published to S3. THIS IS NOT RECOMMENDED FOR PRDOCUTION.
-func (s *Server) SnapshotAndPublish() ( resp *PublishedArchiveResponse, err error) {
-
-  var rcon  *Rcon
-  if s.GoodRcon() && !s.HasRconConnection() {
-    rcon, err = s.NewRcon()
-    if err != nil { return resp, fmt.Errorf("Can't create rcon connection for snapshot snapshot: %s", err)}
-  }
-
-  resp, err = s.archiveAndPublish(rcon)
-  return resp, err
-}
-
-// If we don't already have an RCON, will call NewRconWithRetry to get one.
-func (s *Server) SnapshotAndPublishWithRetry(retries int, waitTime time.Duration) (resp *PublishedArchiveResponse, err error) {
-
-  if !s.HasRconConnection() {
-    if s.NoRcon() { 
-      return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.PublicServerIp, s.RconPort )
-    }
-    if len(s.RconPassword) == 0 {
-      return nil, fmt.Errorf("No rcon password.")
-    }
-
-    _, err = s.NewRconWithRetry(retries, waitTime)
-    if err != nil { return nil, err }
-  }
-
-  resp, err = s.archiveAndPublish(s.Rcon)
-  return resp, err
-}
-
-func (s *Server) GetSnapshotList() (snaps []Archive, err error) {
-  am, err := GetArchives(s.User, s.Name, s.AWSSession)
-  if err == nil {
-    snaps = am.GetSnapshots(s.User)
-  }
-  return snaps, err
-}
-
-func (s *Server) archiveAndPublish(rcon *Rcon) (resp *PublishedArchiveResponse, err error) {
-  resp, err = ArchiveAndPublish(rcon, s.ServerDirectory, s.ArchiveBucket, 
-    s.newSnapshotPath(time.Now()), s.AWSSession)
-  return resp, err
-}
-
-func (s *Server) NewRcon() (rcon *Rcon, err error) {
-  rcon, err = NewRcon(s.PublicServerIp, s.RconPort.String(), s.RconPassword)  
-  if err == nil {
-    s.Rcon = rcon
-  }
-  return rcon, err
-}
-
-
-// Gets a new Rcon connection for the seever. Will retry after waitTime if the connection attempt fails,
-// will try up to retry times. Blocks until finished.
-func (s *Server) NewRconWithRetry(retries int, waitTime time.Duration) (rcon *Rcon, err error) {
-  rcon, err = NewRconWithRetry(s.PublicServerIp, s.RconPort.String(), s.RconPassword, retries, waitTime)
-  if err == nil {
-    s.Rcon = rcon
-  }
-  return rcon, err
-}
-
-func (s *Server) HasRconConnection() (bool) {
-  if s.Rcon == nil {
-    return false
-  }
-  return s.Rcon.HasConnection()
-}
-
-func (s *Server) NoRcon() (bool) {
-  return len(s.PublicServerIp) == 0 || s.RconPort == 0
-  // return len(s.ServerIp) == 0 || len(s.RconPort) == 0
-}
-
-func (s *Server) GoodRcon() (bool) {
-  return !s.NoRcon()
-}
-
-func (s *Server) newSnapshotPath(when time.Time) (string) {
-  return NewSnapshotPath(s.User, s.Name, when)
 }
 

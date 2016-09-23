@@ -25,7 +25,7 @@ func TestArchiveStringNoObject (t *testing.T) {
 
 func TestArchiveStringWithObject (t *testing.T) {
   s := testServer(t, false)
-  path := s.newSnapshotPath(time.Now())
+  path, _ := s.archivePath(ServerSnapshot)
   o := testS3Object(path)
   a := NewArchive(ServerSnapshot, s.User, s.Name, s.ArchiveBucket, o)
   assert.Contains(t, a.String(), path)
@@ -70,16 +70,21 @@ func TestSnapshotPath(t *testing.T) {
   // Full URI
   exURI := S3BaseURI + S3Delim + bucket + S3Delim + user + S3Delim + 
     server + S3Delim + aTypeES + S3Delim + exFileName
-  acURI := SnapshotURI(bucket, user, server, exFileName)
+  acURI := ServerSnapshotURI(bucket, user, server, exFileName)
   assert.Equal(t, exURI, acURI, "URI isn't right.")
 
   fmt.Printf("%s\n", exURI)
   fmt.Printf("%s\n", acURI)
-
 }
 
 func getRandomArchiveType() (ArchiveType) {
   return AllArchiveTypes[rand.Int() % len(AllArchiveTypes)]
+}
+
+func TestArchiveType(t *testing.T) {
+  for ty, ts := range archiveTypeToString {
+    assert.Equal(t, ty, archiveStringToType[ts], "Failed to match %s, %s\n",ty.String(), archiveStringToType[ts].String())
+  }
 }
 
 func TestGetSnapshots (t *testing.T) {
@@ -100,13 +105,13 @@ func TestGetSnapshots (t *testing.T) {
     s := testServer(t, true)
     t := getRandomArchiveType()
     if t == ServerSnapshot && un == user {snapCount++}
-    path := s.newSnapshotPath(time.Now())
+    path, _ := s.archivePath(ServerSnapshot)
 
     a := NewArchive(t, un, sn, "test-bucket", testS3Object(path))
     archiveMap.Add(a)
   }
   assert.Len(t, archiveMap, len(userSet), "ArchiveMap didn't add enough archives.")
-  snaps := archiveMap.GetSnapshots(user)
+  snaps := archiveMap.GetArchives(user, ServerSnapshot)
   assert.Len(t, snaps, snapCount, "Didn't get the right number of snapshots back.")
 }
 

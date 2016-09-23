@@ -50,17 +50,28 @@ var taskArn = "server"
 var server = &Server{
     User: "testuser", 
     Name: "TestServer", 
-    PublicServerIp: "192.168.99.100", 
+    PublicServerIp: "127.0.0.1", 
     ServerPort: 25565, 
     RconPort: 25575, 
     RconPassword: "testing",
     ArchiveBucket: "craft-config-test", 
+    ServerDirectory: "server",
     TaskArn: &taskArn,
 }
 
 func testServer(t *testing.T, useRcon bool) (s *Server) {
   sess := testSession(t)
-  s = server
+  s = &Server{
+    User: "testuser", 
+    Name: "TestServer", 
+    PublicServerIp: "127.0.0.1", 
+    ServerPort: 25565, 
+    RconPort: 25575, 
+    RconPassword: "testing",
+    ArchiveBucket: "craft-config-test", 
+    ServerDirectory: "server",
+    TaskArn: &taskArn,
+  }
   s.AWSSession = sess
   if !useRcon {
     s.PublicServerIp = ""

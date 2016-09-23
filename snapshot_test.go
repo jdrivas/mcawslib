@@ -20,9 +20,11 @@ func TestNewSnapshotPath(t *testing.T) {
   serverElement := s.User + "-" + s.Name
   // This should be: <ServerUser>/<ServerName>/snapshots/<RFC3339TimeString>-<ServerUser>-<ServerName>-snapshot.zip
   // The snapshotPathELement and snapshotFielExt are private contstants in the library.
-  expectedValue := s.User + "/" + s.Name + "/" + snapshotPathElement + "/" + timeElement + serverElement + snapshotFileExt
-  testPath := s.newSnapshotPath(now)
+  expectedValue := s.User + "/" + s.Name + "/" + serverPathElement + "/" + timeElement + serverElement + serverFileExt
+  testPath, _ := s.archivePath(ServerSnapshot)
 
+  // TODO: I expect that this will fail sometimes due to the time string
+  // being hidden in archivePath(). May want to bring that out.
   assert.Equal(t, expectedValue, testPath)
 }
 
@@ -33,12 +35,12 @@ func TestSnapshotAndPublish(t *testing.T) {
   if testing.Short() { t.SkipNow()}
   SetLogLevel(logrus.DebugLevel)
   s := testServer(t, false)
-  resp, err := s.SnapshotAndPublish()
+  resp, err := s.TakeServerSnapshot()
   if assert.NoError(t, err) {
     // Not much of a test this.
     // This should instead do a regex to ensure that
     // The value returned by newSnapshotPath and this agree
-    // The trick is dealing witht time, which won't be an eact match.
+    // The trick is dealing with time, which won't be an eact match.
     // But to be fair, that pretty much turns out to be a test
     // of newSnapshot path because the S3 response on put doesn't
     // actually return the path that it stored the item at.
@@ -51,7 +53,7 @@ func TestGetSnapshotList(t *testing.T) {
   skipOnShort(t)
   log.SetLevel(logrus.DebugLevel)
   s := testServer(t, false)
-  snaps, err := GetSnapshotList(s.User, s.ArchiveBucket, s.AWSSession)
+  snaps, err := GetArchivesFor(ServerSnapshot, s.User, s.ArchiveBucket, s.AWSSession)
   if assert.NoError(t, err) {
     for i, snap := range snaps {
       key := snap.S3Object.Key

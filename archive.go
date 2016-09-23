@@ -24,24 +24,26 @@ type PublishedArchiveResponse struct {
   PutObjectOutput *s3.PutObjectOutput
 }
 
-func ArchiveAndPublish(rcon *Rcon, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
+
+// Create a zipfile (archive) at the serverDirectory and publish it to publishPath on S3.
+func ArchiveAndPublish(rcon *Rcon, fileNames []string, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
   archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
   archivePath := filepath.Join(archiveDir, archiveFileName)
 
   log.Info(logrus.Fields{"archiveDir": serverDirectory, "bucket": bucketName, "publishPath": publishPath}, "Creating Archive.")
 
-  err = ArchiveServer(rcon, serverDirectory, archivePath)
+  err = ArchiveServer(rcon, fileNames, serverDirectory, archivePath)
   if err != nil { return nil, err }
   resp, err = PublishArchive(archivePath, bucketName, publishPath, sess)
   return resp, err
 }
 
-// Produce and archive of a server.
+// Produce an archive of a server.
 // Use an rcon connection to first save-all, then save-off before the archive.
 // When the archive is finished use rcon to save-on.
-// If rcon is nil, then don't do the save-off/save-all/save-on/ THIS IS NOT RECOMMENDED.
-func ArchiveServer(rcon *Rcon, serverDirectory string, archiveFileName string) (err error) {
+// If rcon is nil, then don't do the save-off/save-all/save-on (not for production).
+func ArchiveServer(rcon *Rcon, fileNames []string, serverDirectory string, archiveFileName string) (err error) {
 
   if rcon != nil {
     _, err = rcon.SaveAll()
@@ -50,8 +52,9 @@ func ArchiveServer(rcon *Rcon, serverDirectory string, archiveFileName string) (
     if err != nil { return err }
   }
 
-  err = CreateServerArchive(serverDirectory, archiveFileName)
+  err = CreateServerArchive(fileNames, serverDirectory, archiveFileName)
 
+  // Make sure this happens no matter what.
   if rcon != nil {
     _,rcErr := rcon.SaveOn()
     if err != nil { return err }
@@ -65,7 +68,10 @@ func ArchiveServer(rcon *Rcon, serverDirectory string, archiveFileName string) (
 }
 
 // Make a zipfile of the server directory in directoryName.
-func CreateServerArchive(directoryName, zipfileName string) (err error) {
+// TODO: This currently fails in the face of missing files or directories and
+// the archive is not created. We should revist this and dtermine if there is 
+// a better or different way.
+func CreateServerArchive(fileNames []string, directoryName, zipfileName string) (err error) {
 
   log.Debug(logrus.Fields{"dir": directoryName, "archive": zipfileName,}, "Archiving server.")
   zipFile, err := os.Create(zipfileName)
@@ -87,7 +93,6 @@ func CreateServerArchive(directoryName, zipfileName string) (err error) {
   err = dir.Chdir()
   if err != nil { return fmt.Errorf("CreativeArchiveServer: can't change to server directory %s: %s", directoryName, err) }
 
-  fileNames := getServerFileNames()
   log.Debug(logrus.Fields{"length": len(fileNames),}, "Saving files to archive")
   for _, fileName := range fileNames {
     err = writeFileToZip("", fileName, archive)
@@ -97,21 +102,9 @@ func CreateServerArchive(directoryName, zipfileName string) (err error) {
   return err
 }
 
-func getServerFileNames() []string {
-  files := []string{
-    "config",
-    "logs",
-    "mods",
-    "world",
-    "banned-ips.json",
-    "banned-players.json",
-    "server.properties",
-    "usercache.json",
-    "whitelist.json",
-  }
-  return files
-}
-  
+// This currently errors on unfound files and directories.
+// TODO: consider if we want to allow for missings files to be noted but not 
+//shutdown everything.  
 func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
 
   err = filepath.Walk(fileName, func(path string, info os.FileInfo, err error) (error) {
@@ -152,10 +145,10 @@ func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
 // Puts the archive in the provided bucket:path on S3 in a 'directory' for the user. Bucket must already exist.
 // Config must have keys and region.
 func PublishArchive(archiveFileName string, bucketName string, path string, sess *session.Session) (*PublishedArchiveResponse, error) {
-  // TODO: it may be good to remove this, but as we were having trouble wiht
-  // sessions for a minute there, the resultingpanic wasn't helping, though it's
+  // TODO: it may be good to remove this, but as we were having trouble with
+  // sessions for a minute there, the resulting panic wasn't helping, though it's
   // probably the right behavior.
-  if sess == nil {return nil, fmt.Errorf("mclib#PublishArchive can't have a nil session.Session")}
+  if sess == nil {return nil, fmt.Errorf("PublishArchive can't have a nil session.Session")}
   s3svc := s3.New(sess)
   file, err := os.Open(archiveFileName)
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't open archive file: %s", err)}

@@ -10,9 +10,6 @@ import(
   "github.com/Sirupsen/logrus"
 )
 
-
-
-
 // 
 // ArchiveType
 //
@@ -20,20 +17,38 @@ import(
 // I miss Ruby atoms.
 const (
   ServerSnapshot ArchiveType = iota
-  World ArchiveType = iota
-  BadType ArchiveType = iota
+  WorldSnapshot
+  MiscSnapshot
+  BadType
 )
-var AllArchiveTypes = []ArchiveType{ServerSnapshot, World, BadType}
+var AllArchiveTypes = []ArchiveType{ServerSnapshot, WorldSnapshot, MiscSnapshot, BadType}
 type ArchiveType int
-
-func (a ArchiveType) String() (string) {
-  switch a {
-  case ServerSnapshot: return "Server-Snapshot"
-  case World: return "World"
-  default: return "INVALID ArchiveType"
+var archiveTypeToString = map[ArchiveType]string{
+  ServerSnapshot: "ServerSnapshot",
+  WorldSnapshot: "WorldSnapshot",
+  MiscSnapshot: "MiscSnapshot",
+  BadType: "BadType",
+}
+var archiveStringToType = makeArchiveStringToType()
+func makeArchiveStringToType() map[string]ArchiveType {
+  m := make(map[string]ArchiveType, len(AllArchiveTypes))
+  for _, t := range AllArchiveTypes {
+    m[archiveTypeToString[t]] = t
   }
+  return m
 }
 
+func (a ArchiveType) String() (string) {
+  as := "INVALID ArchiveType"
+  if s, ok := archiveTypeToString[a]; ok {as = s}
+  return as
+}
+
+func ArchiveTypeFrom(s string) (ArchiveType) {
+  at := BadType
+  if t, ok := archiveStringToType[s]; ok { at = t }
+  return at
+}
 
 //
 // Archive
@@ -46,7 +61,7 @@ type Archive struct {
   S3Object *s3.Object
 }
 
-
+// TODO: Remove this for using static const kbants. a := &Arcive{UserName: "me" "ServerName": server, ....  }
 func NewArchive(t ArchiveType, userName, serverName string, bucketName string, object *s3.Object) (a Archive) {
   a.UserName = userName
   a.ServerName = serverName
@@ -82,33 +97,100 @@ func (a Archive) String() (string) {
 type ByLastMod []Archive
 func (a ByLastMod) Len() int { return len(a) }
 func (a ByLastMod) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod().Before(a[j].LastMod())}
+func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod().Before(a[j].LastMod()) }
 
 type ByUser []Archive
 func (a ByUser) Len() int { return len(a) }
 func (a ByUser) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByUser) Less(i, j int) bool { return a[i].UserName < a[j].UserName}
+func (a ByUser) Less(i, j int) bool { return a[i].UserName < a[j].UserName }
 
 type ByType []Archive
 func (a ByType) Len() int { return len(a) }
 func (a ByType) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByType) Less(i, j int) bool { return a[i].Type < a[j].Type}
+func (a ByType) Less(i, j int) bool { return a[i].Type < a[j].Type }
 
 type ByBucket []Archive
 func (a ByBucket) Len() int { return len(a) }
 func (a ByBucket) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByBucket) Less(i, j int) bool { return a[i].Bucket < a[j].Bucket}
+func (a ByBucket) Less(i, j int) bool { return a[i].Bucket < a[j].Bucket }
 
 
 // 
 // ArchiveMap
 //
 
+// TODO: Looks like the archive map came too soon.
+// Let's remove on the next pass and just use type Archives []archive
+// We can add GetAllArchives(...) (ArchiveMap) later if we need it.
 // Keyed on user name.
 type ArchiveMap map[string][]Archive
 
 func NewArchiveMap() (ArchiveMap) {
   return make(ArchiveMap)
+}
+
+// Gets all of the archives for a user. Returns them in an ArchiveMap for convenience.
+func GetArchives(userName, bucketName string, session *session.Session) (archives ArchiveMap, err error) {
+  // TODO: move this to awslib.
+  // GetObjectList(string bucketName, preFix) ([]*s3.Object)
+  // You might consider returning a map of ([string]*s3.Object), keyed on  the storage key.
+
+  s3Svc := s3.New(session)
+  archives = NewArchiveMap()
+
+  // These params get objects for a particular user.
+  params := &s3.ListObjectsV2Input{
+    Bucket: aws.String(bucketName),
+    // Delimiter: aws.String(S3Delim),
+    Prefix: aws.String(getS3ArchivePrefixString(userName)),
+  }
+
+  // Loop over as many as there are .....
+  // TODO:  Move this to S3 and set it up with a proccess function.
+  isTruncated := true
+  for isTruncated {
+    resp, err := s3Svc.ListObjectsV2(params)
+    if err != nil {
+      nerr := fmt.Errorf("Couldn't get objects from bucket %s, with prefix %s: %s", 
+        userName, bucketName, err)
+      return archives, nerr
+    }
+    archives.addFromListResponse(resp)
+
+    // prefixes := make([]string, len(resp.CommonPrefixes))
+    prefixesString := ":"
+    for _, p := range resp.CommonPrefixes {
+      prefixesString += fmt.Sprintf("%s:",*p.Prefix)
+    }
+    log.Debug(logrus.Fields{
+      "inputPrefix:": *params.Prefix,
+      "keyCount": *resp.KeyCount,
+      "bucket": *resp.Name,
+      "isTruncated": *resp.IsTruncated,
+      "noOfCommonPrefixes": len(resp.CommonPrefixes),
+      "prefixes": prefixesString,
+      "objects": len(resp.Contents),
+    }, "Listed a bucket in S3.")
+
+    // Go get more from the server?
+    if *resp.IsTruncated {
+      params.ContinuationToken = resp.NextContinuationToken
+    } else {
+      isTruncated = false
+    }
+  }
+
+  log.Debug(logrus.Fields{"noOfArchives": len(archives[userName])},"Returning archive list.")
+  return archives, err
+}
+
+// Adds to the archive map with an S3 response from listObjects.
+func (am ArchiveMap) addFromListResponse(resp *s3.ListObjectsV2Output) {
+  // log.Debug(logrus.Fields{"objects": len(resp.Contents)}, "adding objects to a map.")
+  for _, object := range resp.Contents {
+    archive := archiveFromS3Object(resp.Name, object)
+    am.Add(archive)
+  }
 }
 
 func (am ArchiveMap) String() (s string) {
@@ -128,18 +210,19 @@ func (am ArchiveMap) Add(a Archive) {
   }
 }
 
-func (am ArchiveMap) GetSnapshots(userName string) (snaps []Archive) {
-  return am.GetArchives(userName, ServerSnapshot)
-}
 
+// General filter for archive based on archive type.
 func (am ArchiveMap) GetArchives(userName string, t ArchiveType) (archiveList []Archive) {
   archives := am[userName]
-  // this is based on the notion that most of the archives will be snapshots.
-  if t == ServerSnapshot {
-    archiveList = make([]Archive,0, len(archives))
-  } else {
+  switch t {
+  case ServerSnapshot, WorldSnapshot:
+    archiveList = make([]Archive,0, len(archives)/2)
+  case MiscSnapshot:
     archiveList = make([]Archive, 0, 50)
+  default: // Should we even be here? Should I panic if we get here?
+    archiveList = make([]Archive, 0, 0)
   }
+
   for _, archive := range archives {
     if archive.Type == t {
       archiveList = append(archiveList, archive)
@@ -149,27 +232,86 @@ func (am ArchiveMap) GetArchives(userName string, t ArchiveType) (archiveList []
 }
 
 
+
+// Convienence to filter on type before you have an Archive Map. (calls GetArchives and appropriate filter.)
+func GetArchivesFor(t ArchiveType, userName, bucketName string, session *session.Session) (snaps []Archive, err error) {
+  am, err := GetArchives(userName, bucketName, session)
+  if err == nil {
+    snaps = am.GetArchives(userName, t)
+  }
+  return snaps, err
+}
+
 //
 // Maping to S3
 // TODO: Move some of this to awslib.
 
 const (
-  snapshotPathElement = "snapshots"
-  snapshotFileExt = "-snapshot.zip"
+  serverPathElement = "server"
+  serverFileExt = "-server.zip"
   worldPathElement = "worlds"
   worldFileExt = "-world.zip"
+  miscPathElement = "misc"
+  miscFileExt = "-misc.zip"
 )
 
+// TODO: Automate the construction of these two.
 var typeToPathElement = map[ArchiveType]string{
-  ServerSnapshot: snapshotPathElement,
-  World: worldPathElement,
+  ServerSnapshot: serverPathElement,
+  WorldSnapshot: worldPathElement,
+  MiscSnapshot: miscPathElement,
 }
 
 var typeToFileExt = map[ArchiveType]string{
-  ServerSnapshot: snapshotFileExt,
-  World: worldFileExt,
+  ServerSnapshot: serverFileExt,
+  WorldSnapshot: worldFileExt,
+  MiscSnapshot: miscFileExt,
 }
 
+// Helper to get the type
+func typeFromS3Key(key *string) (t ArchiveType) {
+  keyElems := strings.Split(*key, S3Delim)
+  switch keyElems[2] {
+  case serverPathElement:
+    t = ServerSnapshot
+  case worldPathElement:
+    t = WorldSnapshot
+  case miscPathElement:
+    t = MiscSnapshot
+  default: 
+    t = BadType
+  }
+  // fmt.Printf("%s: %s => type %s\n", *key, keyElems[2], t.String())
+  return t
+}
+
+// 
+// SPEC for the mapping between archive and place in S3 file system.
+//
+
+// Full qualified URI for a ServerSnapshot given the arguments.
+func ServerSnapshotURI(bucket, userName, serverName, snapshotFileName string) (string) {
+  path := archivePath(userName, serverName, ServerSnapshot)
+  return S3PathJoin(S3BaseURI, bucket, path) + snapshotFileName
+}
+
+// func NewServerSnapshotPath(userName, serverName string, when time.Time) (string) {
+//   return newArchivePath(userName, serverName, when, ServerSnapshot)
+// }
+
+func ArchivePath(userName, serverName string, when time.Time, aType ArchiveType) (string) {
+  pathName := archivePath(userName, serverName, aType)
+  archiveName := archiveFileName(userName, serverName, when, aType)
+  fullPath := pathName + archiveName
+  return fullPath
+}
+
+//
+// Helpers to implement the spec that maps user, server-name, type to a particular
+// place in the S3 file system.
+//
+
+const S3BaseURI = "https://s3.amazonaws.com"
 
 // TODO: Move PathJoin to awslib
 const S3Delim = "/"
@@ -182,28 +324,7 @@ func S3PathJoin(elems ...string ) string {
   return s
 }
 
-const S3BaseURI = "https://s3.amazonaws.com"
-// Full qualified URI for a snapshot given the arguments.
-
-func SnapshotURI(bucket, userName, serverName, snapshotFileName string) (string) {
-  path := archivePath(userName, serverName, ServerSnapshot)
-  return S3PathJoin(S3BaseURI, bucket, path) + snapshotFileName
-}
-
-
-func NewSnapshotPath(userName, serverName string, when time.Time) (string) {
-  return newArchivePath(userName, serverName, when, ServerSnapshot)
-}
-
-func newArchivePath(userName, serverName string, when time.Time, aType ArchiveType) (string) {
-  pathName := archivePath(userName, serverName, aType)
-  archiveName := archiveFileName(userName, serverName, when, aType)
-  fullPath := pathName + archiveName
-  return fullPath
-}
-
-
-// Make the path for an archive based on the constituate values.
+// Make the path for an archive based on the constituent values.
 // This is the mapping definition (see archiveDb_test)
 // <user>/<server>/<archive-type-string>
 func archivePath(user, server string, aType ArchiveType) (string) {
@@ -211,31 +332,21 @@ func archivePath(user, server string, aType ArchiveType) (string) {
   return s
 }
 
-
 // the files names are: <time>-<user>-<server>-<archiveExt>
 func archiveFileName(user, server string, when time.Time, aType ArchiveType) (string) {
   timeString := when.Format(time.RFC3339)
   return timeString + "-" + user + "-" + server + typeToFileExt[aType]
 }
 
-func typeFromS3Key(key *string) (t ArchiveType) {
 
-  keyElems := strings.Split(*key, S3Delim)
-  switch keyElems[2] {
-  case snapshotPathElement:
-    t = ServerSnapshot
-  case worldPathElement:
-    t = World
-  default: 
-    t = BadType
-  }
-  return t
-}
-
+// helper to get the user.
 func userFromS3Key(key *string) (string) {
   return strings.Split(*key, S3Delim)[0]
 }
 
+
+
+// One archive object from the S3 object.
 func archiveFromS3Object(bucketName *string, object *s3.Object) (Archive) {
   // log.Debug(logrus.Fields{"key": *object.Key,},"Archive from object.")
   keyElems := strings.Split(*object.Key, S3Delim)
@@ -246,81 +357,16 @@ func archiveFromS3Object(bucketName *string, object *s3.Object) (Archive) {
     Bucket: *bucketName,
     S3Object: object,
   }
+  // fmt.Printf("\nNewObjectFromS3: %s\n", *object.Key)
+  // fmt.Printf("%#v\n", a)
   return a
 }
 
-func (am ArchiveMap) addFromListResponse(resp *s3.ListObjectsV2Output) {
-  // log.Debug(logrus.Fields{"objects": len(resp.Contents)}, "adding objects to a map.")
-  for _, object := range resp.Contents {
-    archive := archiveFromS3Object(resp.Name, object)
-    am.Add(archive)
-  }
-}
+
 
 // This is for searching on user.
 func getS3ArchivePrefixString(userName string) (string) {
   return userName
 }
 
-
-//
-// Functions to get archives from S3.
-//
-
-// Blocks until finished.
-func GetArchives(userName, bucketName string, session *session.Session) (archives ArchiveMap, err error) {
-  // TODO: move this to awslib.
-  // GetObjectList(string bucketName, preFix) ([]*s3.Object)
-  // You might consider returning a map of ([string]*s3.Object), keyed on  the storage key.
-  s3Svc := s3.New(session)
-  archives = NewArchiveMap()
-  params := &s3.ListObjectsV2Input{
-    Bucket: aws.String(bucketName),
-    // Delimiter: aws.String(S3Delim),
-    Prefix: aws.String(getS3ArchivePrefixString(userName)),
-  }
-
-
-  isTruncated := true
-  for isTruncated {
-    resp, err := s3Svc.ListObjectsV2(params)
-    if err != nil {
-      return archives, 
-        fmt.Errorf("Couldn't get objects from bucket %s, with prefix %s: %s", userName, bucketName, err)
-    }
-    // prefixes := make([]string, len(resp.CommonPrefixes))
-    prefixesString := ":"
-    for _, p := range resp.CommonPrefixes {
-      prefixesString += fmt.Sprintf("%s:",*p.Prefix)
-    }
-    log.Debug(logrus.Fields{
-      "inputPrefix:": *params.Prefix,
-      "keyCount": *resp.KeyCount,
-      "bucket": *resp.Name,
-      "isTruncated": *resp.IsTruncated,
-      "noOfCommonPrefixes": len(resp.CommonPrefixes),
-      "prefixes": prefixesString,
-      "objects": len(resp.Contents),
-    }, "Listed a bucket in S3.")
-
-    archives.addFromListResponse(resp)
-
-    // Go get more from the server?
-    if *resp.IsTruncated {
-      params.ContinuationToken = resp.NextContinuationToken
-    } else {
-      isTruncated = false
-    }
-  }
-
-  return archives, err
-}
-
-func GetSnapshotList(userName, bucketName string, session *session.Session) (snaps []Archive, err error) {
-  am, err := GetArchives(userName, bucketName, session)
-  if err == nil {
-    snaps = am.GetSnapshots(userName)
-  }
-  return snaps, err
-}
 

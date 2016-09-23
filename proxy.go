@@ -2,8 +2,10 @@ package mclib
 
 import(
   "fmt"
+  "strings"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/route53"
+  "github.com/Sirupsen/logrus"
 
   // "awslib"
   "github.com/jdrivas/awslib"
@@ -21,8 +23,8 @@ type Proxy struct {
 
   PublicProxyIp string
   PrivateProxyIp string
-  ProxyPort int64
-  RconPort int64
+  ProxyPort Port
+  RconPort Port
   RconPassword string
   Rcon *Rcon
 
@@ -57,8 +59,8 @@ func NewProxy(name, clusterName, publicIp, privateIp, taskArn, rconPw string,
   p.ClusterName = clusterName
   p.PublicProxyIp = publicIp
   p.PrivateProxyIp = privateIp
-  p.ProxyPort = proxyPort
-  p.RconPort = rconPort
+  p.ProxyPort = Port(proxyPort)
+  p.RconPort = Port(rconPort)
   p.RconPassword = rconPw
   p.TaskArn = taskArn
   p.AWSSession = sess
@@ -109,7 +111,7 @@ func GetProxy(clusterName, taskArn string, sess *session.Session) (p *Proxy, err
   return p, err
 }
 
-func GetProxyByName(clusterName, proxyName string, sess *session.Session) (p *Proxy, err error) {
+func GetProxyByName(proxyName, clusterName string, sess *session.Session) (p *Proxy, err error) {
   proxies, _, err := GetProxies(clusterName, sess)
   if err == nil {
     for _, proxy := range proxies {
@@ -152,12 +154,19 @@ func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session
   return p, ok
 }
 
+
+
 func (p *Proxy) PublicIpAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PublicProxyIp, p.ProxyPort)
 }
 
 func (p *Proxy) RconAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PrivateProxyIp, p.RconPort)
+}
+
+// TODO: This should do a DNS lookup to make sure ....
+func (p *Proxy) PublicDNSName() (string) {
+  return p.GetDomainName()
 }
 
 func (p *Proxy) GetDomainName() (dn string) {
@@ -194,15 +203,89 @@ func (p *Proxy) AttachToNetwork() (domainName string, changeInfo *route53.Change
   domainName = p.GetDomainName()
   comment := fmt.Sprintf("Attaching proxy: %s to network at: %s\n", domainName, p.PublicProxyIp)
   changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, domainName, comment, DefaultProxyTTL ,p.AWSSession)
-  if err != nil { return domainName, changeInfo, err }
 
   return domainName, changeInfo, err
 }
 
+// Attach a server to the network by pointing the server DNS to this proxy's ip, and use
+// this proxy's domain name as the subdomain to attach to.
+func (p *Proxy) AttachServerToNetwork(s *Server) (serverFQDN string, changeInfo *route53.ChangeInfo, err error) {
+
+  domainName := p.GetDomainName()
+  serverName := makeServerName(s)
+  serverFQDN = serverName + "." + domainName
+  comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", s.Name, p.PublicProxyIp, serverFQDN)
+  changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
+
+  return serverFQDN, changeInfo, err
+}
 
 
+func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
+  rcon, err = NewRcon(p.PublicProxyIp, p.RconPort.String(), p.RconPassword)  
+  if err == nil {
+    p.Rcon = rcon
+  }
+  return rcon, err
+}
 
 
+// These commands assume the following bungee plugins: 
+// - BungeeServerManager (/svm)
+// - BungeeRcon (which requires BungeeYamler) (responds to Rcon for Bungee)
+// - BungeeConfig (which requires bfixlib) (/bconf)
+func (p *Proxy) AddServer(s *Server) (err error) {
+  rcon, err := p.NewRcon()
+  if err != nil { return err }
+
+  fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
+
+  // TODO: Once networking is properly worked out, this should change
+  // to a private address.
+  name := makeServerName(s)
+  command := fmt.Sprintf("svm add %s %s", name, s.PublicServerAddress())
+  fmt.Printf("Sending command to rcon: %s\n", command)
+  reply, err := rcon.Send(command)
+  if err != nil { return err }
+  fmt.Printf("Received reply: %s\n", reply)
+  log.Debug(logrus.Fields{"reply": reply, "command": command}, "AddServer reply.")
+
+  return err
+}
+
+// Add the server as a forced host for this proxy on it's first listener.
+// This assumes that there is a server that has already been added
+// to the proxy with AddServer or equivelant.
+// Create a DNS entry for the server pointing to the IP of the proxy and
+// using the subdomain of this poxy.
+// That is: if this proxy is proxy.top-level.com, then we create an A DNS record
+//  of <server-name>.proxy.top-level.com => Proxy.PublicIPAddress()
+func (p *Proxy) ProxyForServer(s *Server) (err error) {
+
+  p.AttachServerToNetwork(s)
+
+  rcon, err := p.NewRcon()
+  if err != nil { return err }
+  fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
+
+  // TODO: Remove punctuation and othewise make sure this is clean.
+  name := makeServerName(s)
+  serverDNSName := fmt.Sprintf("%s.%s", name, p.PublicDNSName())
+  command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverDNSName, name)
+  fmt.Printf("Sending command to rcon: %s\n", command)
+  reply, err := rcon.Send(command)
+  fmt.Printf("Received reply: %s\n", reply)
+  log.Debug(logrus.Fields{"reply": reply, "command": command}, "ProxyForServer reply.")
+
+  return err
+}
+
+// TODO: needs more cleaning (remove punct etc.)
+func makeServerName(s *Server) (string) {
+  name := strings.Replace(s.Name, " ", "-", -1)
+  name = strings.ToLower(name)
+  return name
+}
 
 
 
