@@ -126,6 +126,11 @@
       "portMappings": [
         {
           "hostPort": 0,
+          "containerPort": 25575,
+          "protocol": "tcp"
+        },
+        {
+          "hostPort": 0,
           "containerPort": 25577,
           "protocol": "tcp"
         }
@@ -138,7 +143,7 @@
       "environment": [
           { "name": "CONTAINER_ROLE", "value": "CraftProxy" },
           { "name": "SERVER_USER", "value": "testuser" },
-          { "name": "SERVER_NAME", "value": "bungee-spigot-test" },
+          { "name": "SERVER_NAME", "value": "bungee-spigot-test" }
       ],
       "dockerLabels": null,
       "links": [
