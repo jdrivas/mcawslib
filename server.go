@@ -7,7 +7,7 @@ import(
   // "github.com/aws/aws-sdk-go/aws"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/ecs"
-  // "github.com/Sirupsen/logrus"
+  "github.com/Sirupsen/logrus"
 
   // Be Careful ...
   // "awslib"
@@ -404,5 +404,18 @@ func (s *Server) CraftType() (string) {
   serverType, ok := env[TypeKey]
   if !ok { serverType = "Vanila" }
   return serverType
+}
+
+func (s *Server) LogFields() (logrus.Fields) {
+  cluster := "<none>"
+  if s.ClusterName != "" { cluster = s.ClusterName }
+  arn := "<none>"
+  if s.TaskArn != nil { arn = *s.TaskArn }
+  f := make(logrus.Fields)
+  f["userName"] = s.User
+  f["serverName"] = s.Name
+  f["cluster"] = cluster
+  f["arn"] = arn
+  return f
 }
 

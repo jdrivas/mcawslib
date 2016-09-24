@@ -28,7 +28,7 @@ type PublishedArchiveResponse struct {
 // Create a zipfile (archive) at the serverDirectory and publish it to publishPath on S3.
 func ArchiveAndPublish(rcon *Rcon, fileNames []string, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
-  archiveFileName := fmt.Sprintf("server-%s.zip", time.Now())
+  archiveFileName := fmt.Sprintf("archive-%s.zip", time.Now())
   archivePath := filepath.Join(archiveDir, archiveFileName)
 
   log.Info(logrus.Fields{"archiveDir": serverDirectory, "bucket": bucketName, "publishPath": publishPath}, "Creating Archive.")
