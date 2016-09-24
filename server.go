@@ -18,7 +18,7 @@ import(
 // Proxy versions of these live in proxy.go
 const (
   DefaultVanillaServerTaskDefinition = "minecraft-ecs"
-  DefaultProxiedServerTaskDefinition = "bungee-spigot"
+  DefaultProxiedServerTaskDefinition = "bungee-spigot-nc"
   DefaultServerTaskDefinition = DefaultProxiedServerTaskDefinition
 
   MinecraftServerContainerName = "minecraft"
