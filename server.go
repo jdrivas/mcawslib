@@ -245,7 +245,7 @@ func GetServer(clusterName, taskArn string, sess *session.Session) (s *Server, e
   return s, err
 }
 
-func GetServerForName(n, cluster string, sess *session.Session) (s *Server, err error) {
+func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err error) {
   servers, err := GetServers(cluster, sess)
   if err != nil {return s, err}
   for _, srv := range servers {

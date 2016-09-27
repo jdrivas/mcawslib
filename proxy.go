@@ -111,7 +111,7 @@ func GetProxy(clusterName, taskArn string, sess *session.Session) (p *Proxy, err
   return p, err
 }
 
-func GetProxyByName(proxyName, clusterName string, sess *session.Session) (p *Proxy, err error) {
+func GetProxyFromName(proxyName, clusterName string, sess *session.Session) (p *Proxy, err error) {
   proxies, _, err := GetProxies(clusterName, sess)
   if err == nil {
     for _, proxy := range proxies {

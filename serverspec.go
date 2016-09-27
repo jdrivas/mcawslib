@@ -48,7 +48,7 @@ func NewServerSpec(userName, serverName, region, bucketName, tdArn string,
   td, err := awslib.GetTaskDefinition(tdArn, sess)
   if err != nil { return ss, err }
   ste := make(ServerTaskEnv,2)
-  ste[CraftServerContainerKey] = DefaultProxiedServerTaskEnv(userName, serverName)
+  ste[CraftServerContainerKey] = DefaultProxiedServerTaskEnv(userName, serverName, region)
   ste[CraftControllerContainerKey] = DefaultControllerTaskenv(userName, serverName, region, bucketName)
   ss = ServerSpec{
     TaskDefinition: td,
@@ -108,14 +108,14 @@ func ContainerNameForRole(r string, td *ecs.TaskDefinition) (n string, ok bool) 
 }
 
 
-func DefaultProxiedServerTaskEnv(userName, serverName string) ContainerEnv {
-  cenv := DefaultServerTaskEnv(userName, serverName)
+func DefaultProxiedServerTaskEnv(userName, serverName, region string) ContainerEnv {
+  cenv := DefaultServerTaskEnv(userName, serverName, region)
   cenv[OnlineModeKey] = ProxiedServerOnlineModeDefault
   return cenv
 }
 
 // Region not taken from SESS to enable delployments from other regions.
-func DefaultServerTaskEnv(userName, serverName string) ContainerEnv {
+func DefaultServerTaskEnv(userName, serverName , region string) ContainerEnv {
   cenv := ContainerEnv{
     RoleKey: CraftServerRole,
     ServerUserKey: userName,
@@ -141,6 +141,7 @@ func DefaultServerTaskEnv(userName, serverName string) ContainerEnv {
     LevelKey: LevelDefault,
     OnlineModeKey: OnlineModeDefault,
     JVMOptsKey: JVMOptsDefault,
+    "AWS_REGION": region,
   }
   return cenv
 }
