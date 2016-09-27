@@ -40,7 +40,8 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "minecraft-server",
-          "awslogs-region": "us-east-1"
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "craft-server"
         }
       },
       "extraHosts": null,
@@ -94,7 +95,8 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "minecraft-monitor",
-          "awslogs-region": "us-east-1"
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "server-monitor"
         }
       },      
       "extraHosts": null,

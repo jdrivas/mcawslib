@@ -51,7 +51,8 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "minecraft-server",
-          "awslogs-region": "us-east-1"
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "hub-server"
         }
       },
       "dockerSecurityOptions": null,
@@ -100,7 +101,8 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "minecraft-monitor",
-          "awslogs-region": "us-east-1"
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "hub-monitor"
         }
       },
       "dockerSecurityOptions": null,
@@ -147,7 +149,8 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "minecraft-bungee",
-          "awslogs-region": "us-east-1"
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "proxy-server"
         }
       },
       "dockerSecurityOptions": null,
