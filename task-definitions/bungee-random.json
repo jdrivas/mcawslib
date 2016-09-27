@@ -21,7 +21,9 @@
       ],
       "hostname": null,
       "entryPoint": null,
-      "command": null,
+      "command": [
+        "--noconsole"
+      ],
       "user": null,
       "workingDirectory": null,
       "environment": [
@@ -37,7 +39,7 @@
         { "name": "QUERY_PORT", "value": "25565" },
         { "name": "RCON_PASSWORD", "value": "testing" },
         { "name": "RCON_PORT", "value": "25575" },
-        { "name": "TYPE", "value": "SPIGOT" }
+        { "name": "TYPE", "value": "spigot" }
       ],
       "dockerLabels": {
         "service": "minecraft-hub"
