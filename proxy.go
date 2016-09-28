@@ -215,6 +215,13 @@ func (p *Proxy) AttachServerToNetwork(s *Server) (serverFQDN string, changeInfo 
   serverName := makeServerName(s)
   serverFQDN = serverName + "." + domainName
   comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", s.Name, p.PublicProxyIp, serverFQDN)
+
+  f:= logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+    "serverFQDN": serverFQDN,
+  }
+  log.Info(f, "Attaching server to network.")
+
   changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
 
   return serverFQDN, changeInfo, err
@@ -231,24 +238,34 @@ func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
 
 
 // These commands assume the following bungee plugins: 
-// - BungeeServerManager (/svm)
-// - BungeeRcon (which requires BungeeYamler) (responds to Rcon for Bungee)
 // - BungeeConfig (which requires bfixlib) (/bconf)
 func (p *Proxy) AddServer(s *Server) (err error) {
+  f:= logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+  }
+  log.Info(f, "Adding server to proxy.")
+
   rcon, err := p.NewRcon()
   if err != nil { return err }
 
-  fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
+  // fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
 
   // TODO: Once networking is properly worked out, this should change
   // to a private address.
   name := makeServerName(s)
-  command := fmt.Sprintf("svm add %s %s", name, s.PublicServerAddress())
-  fmt.Printf("Sending command to rcon: %s\n", command)
+  motd := fmt.Sprintf("%s hosted by %s in the %s neighborhood.", s.Name, s.User, s.Name)
+  command :=  fmt.Sprintf("bconf addServer(\"%s\", \"%s\", \"%s\", false)",
+  name, motd, s.PublicServerAddress())
+
   reply, err := rcon.Send(command)
-  if err != nil { return err }
-  fmt.Printf("Received reply: %s\n", reply)
-  log.Debug(logrus.Fields{"reply": reply, "command": command}, "AddServer reply.")
+  f["command"] = command
+  f["reply"] = reply
+  if err != nil { 
+    log.Error(f, "AddServer errored.", err)
+    return err 
+  }
+  // fmt.Printf("Received reply: %s\n", reply)
+  log.Debug(f, "addServer reply.")
 
   return err
 }
@@ -262,20 +279,23 @@ func (p *Proxy) AddServer(s *Server) (err error) {
 //  of <server-name>.proxy.top-level.com => Proxy.PublicIPAddress()
 func (p *Proxy) ProxyForServer(s *Server) (err error) {
 
+  f:= logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+  }
+  log.Info(f, "Setting up proxy to proxy for server - adding a forced host.")
+
   p.AttachServerToNetwork(s)
 
   rcon, err := p.NewRcon()
   if err != nil { return err }
-  fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
 
-  // TODO: Remove punctuation and othewise make sure this is clean.
   name := makeServerName(s)
   serverDNSName := fmt.Sprintf("%s.%s", name, p.PublicDNSName())
   command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverDNSName, name)
-  fmt.Printf("Sending command to rcon: %s\n", command)
   reply, err := rcon.Send(command)
-  fmt.Printf("Received reply: %s\n", reply)
-  log.Debug(logrus.Fields{"reply": reply, "command": command}, "ProxyForServer reply.")
+  f["command"] = command
+  f["reply"] = reply
+  log.Debug(logrus.Fields{"reply": reply, "command": command}, "addForcedHost reply.")
 
   return err
 }
