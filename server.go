@@ -2,6 +2,7 @@ package mclib
 
 import(
   "fmt"
+  "strings"
   "strconv"
   "time"
   // "github.com/aws/aws-sdk-go/aws"
@@ -10,8 +11,8 @@ import(
   "github.com/Sirupsen/logrus"
 
   // Be Careful ...
-  // "awslib"
-  "github.com/jdrivas/awslib"
+  "awslib"
+  // "github.com/jdrivas/awslib"
 
 )
 
@@ -254,6 +255,9 @@ func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err
       break
     }
   }
+  if s == nil {
+    err = fmt.Errorf("Error: coudln't find server with name: %s", n)
+  }
   return s, err
 }
 
@@ -325,6 +329,20 @@ func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Cont
     }
   }
   return c, ok
+}
+
+
+// Spaces removed, used in adding to proxy and such.
+func (s *Server) SafeServerName() (string) {
+  name := strings.Replace(s.Name, " ", "-", -1)
+  return name
+}
+
+// Name suitable for adding to a DNS address
+// Spaces removed and lowercased.
+func (s *Server) DNSName() (string) {
+  name := strings.ToLower(s.SafeServerName())
+  return name
 }
 
 // Does lookups in DNS to find the DNS for this server.
@@ -418,4 +436,5 @@ func (s *Server) LogFields() (logrus.Fields) {
   f["arn"] = arn
   return f
 }
+
 

@@ -7,8 +7,8 @@ import(
   "github.com/aws/aws-sdk-go/service/route53"
   "github.com/Sirupsen/logrus"
 
-  // "awslib"
-  "github.com/jdrivas/awslib"
+  "awslib"
+  // "github.com/jdrivas/awslib"
 )
 
 
@@ -121,6 +121,9 @@ func GetProxyFromName(proxyName, clusterName string, sess *session.Session) (p *
       }
     }
   }
+  if p == nil {
+    err = fmt.Errorf("Error: couldn't find proxy with name: %s", proxyName)
+  }
   return p, err
 }
 
@@ -154,7 +157,9 @@ func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session
   return p, ok
 }
 
-
+func DefaultProxyTLD() (string) {
+  return "hoods.momentlabs.io"
+}
 
 func (p *Proxy) PublicIpAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PublicProxyIp, p.ProxyPort)
@@ -171,7 +176,7 @@ func (p *Proxy) PublicDNSName() (string) {
 
 func (p *Proxy) GetDomainName() (dn string) {
   // dn = p.Name + ".hood.momentlabs.io"
-  dn = p.Name + ".hoods.momentlabs.io"
+  dn = p.Name + "." + DefaultProxyTLD()
   return dn
 }
 
@@ -207,24 +212,43 @@ func (p *Proxy) AttachToNetwork() (domainName string, changeInfo *route53.Change
   return domainName, changeInfo, err
 }
 
+// TODO: Move this to server.
 // Attach a server to the network by pointing the server DNS to this proxy's ip, and use
 // this proxy's domain name as the subdomain to attach to.
-func (p *Proxy) AttachServerToNetwork(s *Server) (serverFQDN string, changeInfo *route53.ChangeInfo, err error) {
+func (p *Proxy) AttachToProxyNetwork(s *Server) (serverFQDN string, changeInfo *route53.ChangeInfo, err error) {
 
-  domainName := p.GetDomainName()
-  serverName := makeServerName(s)
-  serverFQDN = serverName + "." + domainName
-  comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", s.Name, p.PublicProxyIp, serverFQDN)
+  // domainName := p.GetDomainName()
+  // dnsName := s.DNSName()
+  // serverFQDN = dnsName + "." + domainName
+  serverFQDN = p.attachedServerFQDN(s)
+  comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", 
+    s.Name, p.PublicProxyIp, serverFQDN)
 
   f:= logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
     "serverFQDN": serverFQDN,
   }
-  log.Info(f, "Attaching server to network.")
+  log.Info(f, "Attaching server to proxy network.")
 
+  // We do it this way, because we are using the session that is releant to 
+  // the proxy. If somehow a different session was attached to the server
+  // I don't think we'd want to use it. ...... Time will tell.
   changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
-
+  // changeInfo, err = s.AttachToNetwork(p.PublicProxyIp, serverFQDN, comment, p.AWSSession)
   return serverFQDN, changeInfo, err
+}
+
+func (p *Proxy) DetachFromProxyNetwork(s *Server) (changeInfo *route53.ChangeInfo, err error) {
+
+  serverFQDN := p.attachedServerFQDN(s)
+  comment := fmt.Sprintf("Detaching server %s from proxy: Removing DNS record for: %s.",
+    s.Name, serverFQDN)
+  changeInfo, err = awslib.DetachFromDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
+  return changeInfo, err
+}
+
+func (p *Proxy) attachedServerFQDN(s *Server) (string) {
+  return s.DNSName() + "." + p.GetDomainName()
 }
 
 
@@ -239,6 +263,11 @@ func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
 
 // These commands assume the following bungee plugins: 
 // - BungeeConfig (which requires bfixlib) (/bconf)
+// TODO: build out a library that uses these commands directly.
+// way too much repetition here.
+// morevoer we should abstract away the Rcon connection.
+// it works, but longer term this has to be gotten rid of for 
+// something more secure and robust.
 func (p *Proxy) AddServer(s *Server) (err error) {
   f:= logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
@@ -252,10 +281,9 @@ func (p *Proxy) AddServer(s *Server) (err error) {
 
   // TODO: Once networking is properly worked out, this should change
   // to a private address.
-  name := makeServerName(s)
   motd := fmt.Sprintf("%s hosted by %s in the %s neighborhood.", s.Name, s.User, s.Name)
   command :=  fmt.Sprintf("bconf addServer(\"%s\", \"%s\", \"%s\", false)",
-  name, motd, s.PublicServerAddress())
+    s.Name, motd, s.PublicServerAddress())
 
   reply, err := rcon.Send(command)
   f["command"] = command
@@ -268,6 +296,43 @@ func (p *Proxy) AddServer(s *Server) (err error) {
   log.Debug(f, "addServer reply.")
 
   return err
+}
+
+func (p *Proxy) RemoveServer(s *Server) (error) {
+  f:= logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+  }
+  log.Info(f, "Removing server from  proxy.")
+
+  found, err := p.isServerProxied(s)
+  if err != nil { return err }
+  if !found { 
+    return fmt.Errorf("Server: %s not with this proxy: %s.", s.Name, p.Name)
+  }
+
+  // Remove the server
+  rcon, err := p.NewRcon()
+  if err != nil { return err }
+
+  command :=  fmt.Sprintf("bconf remServer(\"%s\")", s.Name)
+  reply, err := rcon.Send(command)
+  f["command"] = command
+  f["reply"] = reply
+  if err != nil { 
+    log.Error(f, "AddServer errored.", err)
+    return err 
+  }
+
+  // remove the forcedHost()
+  // TODO: Check for forced host. Let's not remove it if it's not there.
+  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), p.PublicDNSName())
+  command = fmt.Sprintf("bconf remForcedHost(%d, \"%s\")", 0, serverFQDN)
+  reply, err = rcon.Send(command)
+  f["command"] = command
+  f["reply"] = reply
+  log.Debug(logrus.Fields{"reply": reply, "command": command}, "remForcedHost reply.")
+
+  return nil
 }
 
 // Add the server as a forced host for this proxy on it's first listener.
@@ -284,14 +349,17 @@ func (p *Proxy) ProxyForServer(s *Server) (err error) {
   }
   log.Info(f, "Setting up proxy to proxy for server - adding a forced host.")
 
-  p.AttachServerToNetwork(s)
+  p.AttachToProxyNetwork(s)
 
   rcon, err := p.NewRcon()
   if err != nil { return err }
 
-  name := makeServerName(s)
-  serverDNSName := fmt.Sprintf("%s.%s", name, p.PublicDNSName())
-  command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverDNSName, name)
+  // TODO: There is a default forcedHost entry in a proxy if it's set up clean.
+  // This entry refers to a non-existent server and so will spit out an error message
+  // when reset saying so. We should probably remove it once
+  // we have an actual real forced host.
+  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), p.PublicDNSName())
+  command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverFQDN, s.Name)
   reply, err := rcon.Send(command)
   f["command"] = command
   f["reply"] = reply
@@ -300,13 +368,37 @@ func (p *Proxy) ProxyForServer(s *Server) (err error) {
   return err
 }
 
-// TODO: needs more cleaning (remove punct etc.)
-func makeServerName(s *Server) (string) {
-  name := strings.Replace(s.Name, " ", "-", -1)
-  name = strings.ToLower(name)
-  return name
+func (p *Proxy) isServerProxied(s *Server) (bool, error) {
+  serverNames, err := p.ServerNames()
+  if err != nil { return false, err }
+  found := false
+  for _, n := range serverNames {
+    if n == s.Name {
+      found = true
+      break
+    }
+  }
+  return found, err
 }
 
+// The names of the servers that are currently available through this proxy.
+// Yes, of course I know this is not the way to do this.
+// For now it's all I have however ......
+func (p *Proxy) ServerNames() ([]string, error) {
+  ns := []string{"Error-Getting-Server-Names"}
+  rcon, err := p.NewRcon()
+  if err != nil { return ns, err }
 
+  command := fmt.Sprintf("bconf getServers().getKeys()")
+  reply, err := rcon.Send(command)
+  if err != nil { return ns, err }
+
+  reply = strings.Trim(reply, "[] \n")
+  names := strings.Split(reply, ",")
+  for i, n := range names {
+    names[i] = strings.Trim(n, " ")
+  }
+  return names, nil
+}
 
 

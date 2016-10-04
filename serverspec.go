@@ -5,8 +5,8 @@ import(
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/ecs"
 
-  // "awslib"
-  "github.com/jdrivas/awslib"
+  "awslib"
+  // "github.com/jdrivas/awslib"
 )
 
 // TODO: IMPORTANT
@@ -42,6 +42,7 @@ const(
 // TODO: Validate TaskDefinition for Roles before we try to run it.
 // TODO: Consider adding the TD register function here, or providing
 // some kind of plug-in to ecs-pilot to validate TDs.
+// TODO: validate new server names (upperlowercase, no punct but - and _)??
 func NewServerSpec(userName, serverName, region, bucketName, tdArn string, 
   sess *session.Session) (ss ServerSpec, err error) {
 
