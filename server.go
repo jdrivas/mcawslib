@@ -11,8 +11,8 @@ import(
   "github.com/Sirupsen/logrus"
 
   // Be Careful ...
-  "awslib"
-  // "github.com/jdrivas/awslib"
+  // "awslib"
+  "github.com/jdrivas/awslib"
 
 )
 

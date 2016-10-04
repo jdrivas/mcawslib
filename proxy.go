@@ -7,8 +7,8 @@ import(
   "github.com/aws/aws-sdk-go/service/route53"
   "github.com/Sirupsen/logrus"
 
-  "awslib"
-  // "github.com/jdrivas/awslib"
+  // "awslib"
+  "github.com/jdrivas/awslib"
 )
 
 
