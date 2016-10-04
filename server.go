@@ -2,7 +2,6 @@ package mclib
 
 import(
   "fmt"
-  "strings"
   "strconv"
   "time"
   // "github.com/aws/aws-sdk-go/aws"
@@ -329,26 +328,6 @@ func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Cont
     }
   }
   return c, ok
-}
-
-
-// Spaces removed, used in adding to proxy and such.
-func (s *Server) SafeServerName() (string) {
-  name := strings.Replace(s.Name, " ", "-", -1)
-  return name
-}
-
-// Name suitable for adding to a DNS address
-// Spaces removed and lowercased.
-func (s *Server) DNSName() (string) {
-  name := strings.ToLower(s.SafeServerName())
-  return name
-}
-
-// Does lookups in DNS to find the DNS for this server.
-// OR at least it should/will.
-func (s *Server) DNSAddress() (string) {
-  return s.PublicServerIp + ":" + s.ServerPort.String()
 }
 
 func (s *Server) PublicServerAddress() (string) {

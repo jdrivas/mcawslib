@@ -4,7 +4,6 @@ import(
   "fmt"
   "strings"
   "github.com/aws/aws-sdk-go/aws/session"
-  "github.com/aws/aws-sdk-go/service/route53"
   "github.com/Sirupsen/logrus"
 
   // "awslib"
@@ -128,7 +127,7 @@ func GetProxyFromName(proxyName, clusterName string, sess *session.Session) (p *
 }
 
 // TODO: THIS IS IMPORTANT. We need to check the DNS to see if we're 
-// currently attached to tne network or not.  Suggested updates 
+// currently attached to tne network or not. Suggested updates 
 // include: add a new field to the Proxy struct which is the
 // actual DNS address for this proxy and have this function AND 
 // ONLY this function fill it out.
@@ -157,10 +156,6 @@ func GetProxyFromTask(dt *awslib.DeepTask, taskArn string, sess *session.Session
   return p, ok
 }
 
-func DefaultProxyTLD() (string) {
-  return "hoods.momentlabs.io"
-}
-
 func (p *Proxy) PublicIpAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PublicProxyIp, p.ProxyPort)
 }
@@ -169,86 +164,10 @@ func (p *Proxy) RconAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PrivateProxyIp, p.RconPort)
 }
 
-// TODO: This should do a DNS lookup to make sure ....
-func (p *Proxy) PublicDNSName() (string) {
-  return p.GetDomainName()
-}
-
-func (p *Proxy) GetDomainName() (dn string) {
-  // dn = p.Name + ".hood.momentlabs.io"
-  dn = p.Name + "." + DefaultProxyTLD()
-  return dn
-}
 
 // This can be a little expensive. It makes 4 calls to AWS.
 func (p *Proxy) GetDeepTask() (dt *awslib.DeepTask, err error) {
   return awslib.GetDeepTask(p.ClusterName, p.TaskArn, p.AWSSession)
-}
-
-// Associate with a possibly new ElasticIP address and publish 
-// (or reuse) a DNS entry for this proxy.
-// type AttachNetworkResp struct {
-//   EIPStatus *ec2.AllocateAddressOutput // AllocationId *string, Domain *string, PublicIp *string
-//   DNSStatus *route53.ChangeInfo // Comment *string, Id *string, Status *string, SubmittedAt *time.Time
-//   AssocId *string // association id for the EIP to Instance association.
-//   DNSAddress string
-// }
-
-// This should probably be longer ......
-const DefaultProxyTTL int64 = 60
-
-// Grab an IP then push it to DNS and attach to the instance.
-// Actually I don't really need the EIP .... Just an attach.
-func (p *Proxy) AttachToNetwork() (domainName string, changeInfo *route53.ChangeInfo, err error) {
-
-  // eipResp, err := awslib.GetNewEIP(p.AWSSession)
-  // if err != nil { return anr, err }
-  // anr.EIPStatus = eipResp
-
-  domainName = p.GetDomainName()
-  comment := fmt.Sprintf("Attaching proxy: %s to network at: %s\n", domainName, p.PublicProxyIp)
-  changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, domainName, comment, DefaultProxyTTL ,p.AWSSession)
-
-  return domainName, changeInfo, err
-}
-
-// TODO: Move this to server.
-// Attach a server to the network by pointing the server DNS to this proxy's ip, and use
-// this proxy's domain name as the subdomain to attach to.
-func (p *Proxy) AttachToProxyNetwork(s *Server) (serverFQDN string, changeInfo *route53.ChangeInfo, err error) {
-
-  // domainName := p.GetDomainName()
-  // dnsName := s.DNSName()
-  // serverFQDN = dnsName + "." + domainName
-  serverFQDN = p.attachedServerFQDN(s)
-  comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", 
-    s.Name, p.PublicProxyIp, serverFQDN)
-
-  f:= logrus.Fields{
-    "proxy": p.Name, "server": s.Name, "user": s.User,
-    "serverFQDN": serverFQDN,
-  }
-  log.Info(f, "Attaching server to proxy network.")
-
-  // We do it this way, because we are using the session that is releant to 
-  // the proxy. If somehow a different session was attached to the server
-  // I don't think we'd want to use it. ...... Time will tell.
-  changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
-  // changeInfo, err = s.AttachToNetwork(p.PublicProxyIp, serverFQDN, comment, p.AWSSession)
-  return serverFQDN, changeInfo, err
-}
-
-func (p *Proxy) DetachFromProxyNetwork(s *Server) (changeInfo *route53.ChangeInfo, err error) {
-
-  serverFQDN := p.attachedServerFQDN(s)
-  comment := fmt.Sprintf("Detaching server %s from proxy: Removing DNS record for: %s.",
-    s.Name, serverFQDN)
-  changeInfo, err = awslib.DetachFromDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
-  return changeInfo, err
-}
-
-func (p *Proxy) attachedServerFQDN(s *Server) (string) {
-  return s.DNSName() + "." + p.GetDomainName()
 }
 
 
@@ -276,8 +195,6 @@ func (p *Proxy) AddServer(s *Server) (err error) {
 
   rcon, err := p.NewRcon()
   if err != nil { return err }
-
-  // fmt.Printf("Connected to RCON: %s:%d\n", rcon.Host, rcon.Port )
 
   // TODO: Once networking is properly worked out, this should change
   // to a private address.
@@ -325,7 +242,13 @@ func (p *Proxy) RemoveServer(s *Server) (error) {
 
   // remove the forcedHost()
   // TODO: Check for forced host. Let's not remove it if it's not there.
-  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), p.PublicDNSName())
+  proxyFQDN, _, err := p.PublicDNS()
+  if err != nil { 
+    proxyFQDN = p.DomainName()
+    f["usingForcedHostName"] = proxyFQDN
+    log.Error(f, "Failed to get proxy name from DNS. Will try to remove server forced host anyway.", err)
+  }
+  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
   command = fmt.Sprintf("bconf remForcedHost(%d, \"%s\")", 0, serverFQDN)
   reply, err = rcon.Send(command)
   f["command"] = command
@@ -348,17 +271,28 @@ func (p *Proxy) ProxyForServer(s *Server) (err error) {
     "proxy": p.Name, "server": s.Name, "user": s.User,
   }
   log.Info(f, "Setting up proxy to proxy for server - adding a forced host.")
-
-  p.AttachToProxyNetwork(s)
+  _, _, err = p.AttachToProxyNetwork(s)
+  if err != nil {
+    log.Error(f, "Failed to created DNS for server. Proxy is not set up.", err)
+    return err
+  }
 
   rcon, err := p.NewRcon()
-  if err != nil { return err }
+  if err != nil { 
+    log.Error(f, "Failed to get an RCON connection. Server DNS points to proxy, but proxy forced host not added.", err)
+    return err 
+  }
 
   // TODO: There is a default forcedHost entry in a proxy if it's set up clean.
   // This entry refers to a non-existent server and so will spit out an error message
   // when reset saying so. We should probably remove it once
   // we have an actual real forced host.
-  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), p.PublicDNSName())
+  proxyFQDN, _, err := p.PublicDNS()
+  if err != nil { 
+    log.Error(f, "Failed to get public DNS. Server DNS points to proxy, but proxy forced host not added.", err)
+    return err 
+  }
+  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
   command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverFQDN, s.Name)
   reply, err := rcon.Send(command)
   f["command"] = command
