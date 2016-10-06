@@ -166,10 +166,9 @@ func (p *Proxy) RconAddress() (string) {
 
 
 // This can be a little expensive. It makes 4 calls to AWS.
-func (p *Proxy) GetDeepTask() (dt *awslib.DeepTask, err error) {
-  return awslib.GetDeepTask(p.ClusterName, p.TaskArn, p.AWSSession)
-}
-
+// func (p *Proxy) GetDeepTask() (dt *awslib.DeepTask, err error) {
+//   return awslib.GetDeepTask(p.ClusterName, p.TaskArn, p.AWSSession)
+// }
 
 func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
   rcon, err = NewRcon(p.PublicProxyIp, p.RconPort.String(), p.RconPassword)  
@@ -177,6 +176,15 @@ func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
     p.Rcon = rcon
   }
   return rcon, err
+}
+
+// Get Rcon returns a working rcon connection and 
+// will reuse an existing one if possible
+func (p *Proxy) GetRcon() (rcon *Rcon, err error) {
+  if p.Rcon == nil {
+    _, err = p.NewRcon()
+  }
+  return p.Rcon, err 
 }
 
 
@@ -187,13 +195,16 @@ func (p *Proxy) NewRcon() (rcon *Rcon, err error) {
 // morevoer we should abstract away the Rcon connection.
 // it works, but longer term this has to be gotten rid of for 
 // something more secure and robust.
-func (p *Proxy) AddServer(s *Server) (err error) {
+
+// Add the server to the proxy. Access to server is availble when connected
+// through the proxy.
+func (p *Proxy) AddServerAccess(s *Server) (err error) {
   f:= logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
   }
-  log.Info(f, "Adding server to proxy.")
+  log.Info(f, "Adding server access to proxy.")
 
-  rcon, err := p.NewRcon()
+  rcon, err := p.GetRcon()
   if err != nil { return err }
 
   // TODO: Once networking is properly worked out, this should change
@@ -206,56 +217,53 @@ func (p *Proxy) AddServer(s *Server) (err error) {
   f["command"] = command
   f["reply"] = reply
   if err != nil { 
-    log.Error(f, "AddServer errored.", err)
+    log.Error(f, "Remore addServer failed.", err)
     return err 
   }
   // fmt.Printf("Received reply: %s\n", reply)
-  log.Debug(f, "addServer reply.")
+  log.Info(f, "Remote addServer reply.")
 
   return err
 }
 
-func (p *Proxy) RemoveServer(s *Server) (error) {
+
+// TODO: Need to remove the rcon stuff here, and find a better way to 
+// determine success.
+// Remove access to the server for this proxy. The server is no longer
+// reachable through the proxy.
+func (p *Proxy) RemoveServerAccess(s *Server) (error) {
+
   f:= logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
   }
-  log.Info(f, "Removing server from  proxy.")
+  log.Info(f, "Removing server from  proxy (proxy access and forced-host)")
 
   found, err := p.isServerProxied(s)
   if err != nil { return err }
   if !found { 
-    return fmt.Errorf("Server: %s not with this proxy: %s.", s.Name, p.Name)
+    err = fmt.Errorf("Server: %s not with this proxy: %s.", s.Name, p.Name)
+    log.Error(f,"Server not removed.", err)
+    return err
   }
 
-  // Remove the server
-  rcon, err := p.NewRcon()
-  if err != nil { return err }
+  rcon, err := p.GetRcon()
+  if err != nil { 
+    log.Error(f,"Server not removed.", err)
+    return err 
+  }
 
+  // Remove the server access from the proxy.
   command :=  fmt.Sprintf("bconf remServer(\"%s\")", s.Name)
   reply, err := rcon.Send(command)
   f["command"] = command
   f["reply"] = reply
   if err != nil { 
-    log.Error(f, "AddServer errored.", err)
-    return err 
+    log.Error(f, "Proxy access to Server remove: Remote removeServer errored.", err)
+  } else {
+    log.Info(f, "Proxy access to server remove: complete.")
   }
 
-  // remove the forcedHost()
-  // TODO: Check for forced host. Let's not remove it if it's not there.
-  proxyFQDN, _, err := p.PublicDNS()
-  if err != nil { 
-    proxyFQDN = p.DomainName()
-    f["usingForcedHostName"] = proxyFQDN
-    log.Error(f, "Failed to get proxy name from DNS. Will try to remove server forced host anyway.", err)
-  }
-  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
-  command = fmt.Sprintf("bconf remForcedHost(%d, \"%s\")", 0, serverFQDN)
-  reply, err = rcon.Send(command)
-  f["command"] = command
-  f["reply"] = reply
-  log.Debug(logrus.Fields{"reply": reply, "command": command}, "remForcedHost reply.")
-
-  return nil
+  return err
 }
 
 // Add the server as a forced host for this proxy on it's first listener.
@@ -265,39 +273,68 @@ func (p *Proxy) RemoveServer(s *Server) (error) {
 // using the subdomain of this poxy.
 // That is: if this proxy is proxy.top-level.com, then we create an A DNS record
 //  of <server-name>.proxy.top-level.com => Proxy.PublicIPAddress()
-func (p *Proxy) ProxyForServer(s *Server) (err error) {
+func (p *Proxy) StartProxyForServer(s *Server) (err error) {
 
   f:= logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
   }
-  log.Info(f, "Setting up proxy to proxy for server - adding a forced host.")
-  _, _, err = p.AttachToProxyNetwork(s)
+  log.Info(f, "Adding proxy as a network-proxy for server.")
+
+  serverFQDN, err := p.ProxiedServerFQDN(s)
   if err != nil {
-    log.Error(f, "Failed to created DNS for server. Proxy is not set up.", err)
+    log.Error(f, "Failed to obtain server address from DNS. Proxy not started for Server", err)
     return err
   }
+  f["serverFQDN"] = serverFQDN
 
-  rcon, err := p.NewRcon()
+  rcon, err := p.GetRcon()
   if err != nil { 
-    log.Error(f, "Failed to get an RCON connection. Server DNS points to proxy, but proxy forced host not added.", err)
+    log.Error(f, "Failed to get an RCON connection. Proxy not started for Server", err)
     return err 
   }
 
-  // TODO: There is a default forcedHost entry in a proxy if it's set up clean.
-  // This entry refers to a non-existent server and so will spit out an error message
-  // when reset saying so. We should probably remove it once
-  // we have an actual real forced host.
-  proxyFQDN, _, err := p.PublicDNS()
-  if err != nil { 
-    log.Error(f, "Failed to get public DNS. Server DNS points to proxy, but proxy forced host not added.", err)
-    return err 
-  }
-  serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
+  // serverFQDN := fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
   command := fmt.Sprintf("bconf addForcedHost(%d, \"%s\", \"%s\")", 0, serverFQDN, s.Name)
   reply, err := rcon.Send(command)
   f["command"] = command
   f["reply"] = reply
-  log.Debug(logrus.Fields{"reply": reply, "command": command}, "addForcedHost reply.")
+  log.Info(f, "Remote addForcedHost reply.")
+
+  return err
+}
+
+
+// Stop proxying for the Server.
+// Assumes that the server DNS record is still pointing to the proxy.
+// Wil
+func (p* Proxy) StopProxyForServer(s *Server) (error) {
+
+  f := logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+  }
+
+  rcon, err := p.GetRcon()
+  if err != nil { 
+    log.Error(f,"Server not removed.", err)
+    return err 
+  }
+
+  serverFQDN, err := p.ProxiedServerFQDN(s)
+  if err != nil { 
+    serverFQDN = p.attachedServerFQDN(s)
+    log.Error(f, "Failed to get proxy name from DNS. Will try to remove server forced host anyway.", err)
+  }
+  f["serverFQDN"] = serverFQDN
+
+  command := fmt.Sprintf("bconf remForcedHost(%d, \"%s\")", 0, serverFQDN)
+  reply, err := rcon.Send(command)
+  f["command"] = command
+  f["reply"] = reply
+  if err == nil {
+    log.Info(f, "Remote remove-forced-host completed.")
+  } else {
+    log.Error(f, "Failed on remote remove-forced-host: will try to remote remove-server.", err)
+  }
 
   return err
 }
@@ -320,7 +357,7 @@ func (p *Proxy) isServerProxied(s *Server) (bool, error) {
 // For now it's all I have however ......
 func (p *Proxy) ServerNames() ([]string, error) {
   ns := []string{"Error-Getting-Server-Names"}
-  rcon, err := p.NewRcon()
+  rcon, err := p.GetRcon()
   if err != nil { return ns, err }
 
   command := fmt.Sprintf("bconf getServers().getKeys()")

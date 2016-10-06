@@ -14,23 +14,27 @@ import(
 
 // Returns the TLD that all proxies would be attached to.
 // This can be used to filter DNS records.
+// TODO: This needs to go in a configuration file.
 func DefaultProxyTLD() (string) {
   return "hoods.momentlabs.io"
 }
 
-// 
-// Get Published DNS
-// Returns all the records that are based on the DefaultProxytTLD()
+// Returns DNS records that are based on DefaultProxytTLD()
 func GetDNSRecords(sess *session.Session) ([]*route53.ResourceRecordSet, error) {
   recordSet, err := awslib.ListDNSRecords(DefaultProxyTLD(), sess)
    return recordSet, err
 }
 
-// Returns DNS records attached to the proxy.
+// Returns DNS records that are based on p.DNSName()
 func (p *Proxy) DNSRecords() ([]*route53.ResourceRecordSet, error) {
-  recordSet, err := awslib.ListDNSRecords(p.DomainName(), p.AWSSession)
+  recordSet, err := awslib.ListDNSRecords(p.DNSName(), p.AWSSession)
   return recordSet, err
 }
+
+// TODO: Much of this is probably best expressed as an interface.
+// I also have to figure out the best way to remove all of the duplication betwen
+// Server and Proxy. I haven't done that yet (though it's getting eggregious) because
+// I'm not sure really how these relate. But ... something will have to be done soon.
 
 //
 // Proxy DNS
@@ -39,144 +43,252 @@ func (p *Proxy) DNSRecords() ([]*route53.ResourceRecordSet, error) {
 // This should probably be longer ......
 const DefaultProxyTTL int64 = 60
 
-// TODO: This should do a DNS lookup to make sure ....
-func (p *Proxy) PublicDNS() (string, string, error) {
+// TODO: Clearly a work in progress. 
+// TODO: Consider adding DNS Name and DNS Address to Proxy for caching purposes.
+// Obviously this would require that we ensure that make sure that anything that comes
+// though the proxy/server that updates DNS deals with the cache. It also means potentially
+// reporing incorrect results in any number of cases where DNS is updated outside the
+// scope of a single user and this library. Given that there is no performance issue
+// to hand, let's leave it for now.
 
-  name, ipAddress := "<unknown>", "<none>"
+// This will do a DNS lookup for the expected name proxy: p.DNSName().
+// If the record for that name does not have an entry for the 'execpted'
+// ip address (p.PublicProxyIp) you will get an error. An mclib.DNSError is 
+// returned with the name and the found addesses.
+// In the future we might either let the function return the found values
+// or the error object may have them.
+// Other errors are possibile (e.g. record not found ....)
+func (p *Proxy) PublicDNS() (fqdn, ipAddress string, err error) {
+
   records, err := p.DNSRecords()
-  if err != nil { return name, ipAddress, err }
+  if err != nil { return fqdn, ipAddress, err }
 
-  // There are a couple of things we need to check.
-  // - The host the proxy is running on must have the public IP.
-  // - we *expect* that the DNS name of the proxy will be derived
-  // from the name of the proxy.
-  dn := p.DomainName()
-  ip := p.PublicProxyIp
-  var nameR, ipR *route53.ResourceRecordSet
-  nameIp, ipIp := "<none>", "<none>"
+  fqdn, ipAddress = "<unknown>", "<none>"
+  expectedName := p.DNSName() + "." // the name in records return with the "." at the end.
+  expectedIp := p.PublicProxyIp
+  var nameR *route53.ResourceRecordSet
+  var nameIp, foundIp string
   for _, r := range records {
-    if *r.Name == dn { 
-      nameR = r
-      if len(r.ResourceRecords) > 0 {
-        nameIp = *r.ResourceRecords[0].Value
-      }
-    }
-    for _, rr := range r.ResourceRecords {
-      if *rr.Value == ip { 
-        ipR = r 
-        if len(r.ResourceRecords) > 0 {
-          ipIp = *r.ResourceRecords[0].Value
+    // There could be many records that have the same IP as the proxy.
+    // that's what we do with forced hosts (ie. servers which we serve as proxy.)
+    if *r.Name == expectedName {
+      nameR = r 
+      for _, rr := range r.ResourceRecords {
+        if *rr.Value == expectedIp {
+          nameIp = *rr.Value
+          break
         }
-        break
+        // Didin't find what we were looking for?
+        if nameIp == "" && len(r.ResourceRecords) > 0 {
+          foundIp = *r.ResourceRecords[0].Value
+        }
       }
+      break
     }
-    if nameR != nil && ipR != nil { break }
   }
 
-  // If there is a descrepsnecy then send an error, but keep relevant values.
-  // Currently this is an undocumented 'feature'. We could return an error object
-  // withthe fou
+  f := logrus.Fields{
+    "foundDNSRecords": len(records),
+    "proxy": p.Name,
+    "publicIp": p.PublicProxyIp,
+    "expectedName":  expectedName,
+    "expectedIp": expectedIp,
+    "foundName": fqdn,
+    "foundIp": ipAddress,
+  }
   switch {
-  case nameR == nil && ipR == nil:
-    err = fmt.Errorf("Failure to find DNS record for either name (%s) or ip (%s)", dn, ip)
-  case ipR == nil:
-    name = *nameR.Name
-    ipAddress = nameIp
-    err = fmt.Errorf("UNEXPECTED IP: Failure to find record for expected ip (%s), " +
-      "found record for expected name: (%s) record: (%s:%s)", ip, dn, name, ipAddress )
-  case nameR  == nil:
-    name = *ipR.Name
-    ipAddress = ipIp
-    err = fmt.Errorf("UNEXPECTED NAME: Failure to find record for expected name (%s), " + 
-      "found record for expected ip: (%s) record: (%s:%s)", dn, ip, name, ipAddress)
-  case nameR != ipR:
-    err = fmt.Errorf("UNEXPECTED VALUES: Record for expected name (%s) " +
-      "differed from record for expected IP (%s) name-record (%s:%s) ip-record(%s:%s)",
-      dn, ip, *nameR.Name, nameIp, *ipR.Name, ipIp)
+  // Found nothing.
+  case nameR == nil:
+    err = NewDNSError("Failure to find a DNS record for this proxy", "<not-found>", []string{})
+    log.Error(f, "Failed to get Proxy PublicDNS: No matching DNS.", err)
+  // Found a record based on the name, but got something othesr than the expected ip.
+  case foundIp != "":
+    f["foundName"] = *nameR.Name
+    f["foundIp"] = foundIp
+    err = NewDNSErrorAWS("Unexpected IP address: found name but different ip", *nameR.Name, nameR.ResourceRecords)
+    log.Error(f, "Failed to get Proxy PublicDNS: Unexpected IP address.", err)
+  // Found a name but no ip. This really shouldn't happen in the normal course of things.
+  case nameIp == "": 
+    f["foundName"] = *nameR.Name
+    err = NewDNSErrorAWS("No IP Address: found name but no IP", *nameR.Name, nameR.ResourceRecords)
+    log.Error(f, "Failed to get Proxy PublicDNS: No IP address.", err)
   default:
-    name = *nameR.Name
+    fqdn = *nameR.Name
     ipAddress = nameIp
+    f["foundName"] = *nameR.Name
+    f["foundIp"] = nameIp
+    log.Info(f, "Retrieved Proxy DNS.")
   }
-
-  return name, ipAddress, err
+  return fqdn, ipAddress, err
 }
 
+
 // Returns a string that should be used as a DNS name for this server.
-func (p *Proxy) DomainName() (dn string) {
+// This does not query DNS.
+func (p *Proxy) DNSName() (dn string) {
   dn = nameToDNSForm(p.Name) + "." + DefaultProxyTLD()
   return dn
 }
 
 // Add/Update the DNS record for this proxy server.
+// The DNS will create/update an A record for p.DomsinName() => p.PublicProxyIp()
+// The expected IP address is the public IP address of the VM/Machine instance where the container is running.
 func (p *Proxy) AttachToNetwork() (domainName string, changeInfo *route53.ChangeInfo, err error) {
 
-  domainName = p.DomainName()
+  domainName = p.DNSName()
   comment := fmt.Sprintf("Attaching proxy: %s to network at: %s\n", domainName, p.PublicProxyIp)
   changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, domainName, comment, DefaultProxyTTL ,p.AWSSession)
 
   return domainName, changeInfo, err
 }
 
-// Add/Update DNS to add this server name off of the proxy network and assign the IP to the proxy.
+// Add/Update DNS for the server.
+// The DNS will create/update an A record for s.DNSName() "." p.DNSName() => p.PublicProxyIp()
+// The execpted IP address is the public IP of the VM/Machine instance where the proxy container is running.
 func (p *Proxy) AttachToProxyNetwork(s *Server) (serverFQDN string, changeInfo *route53.ChangeInfo, err error) {
 
-  // domainName := p.GetDomainName()
-  // dnsName := s.DNSName()
-  // serverFQDN = dnsName + "." + domainName
   serverFQDN = p.attachedServerFQDN(s)
   comment := fmt.Sprintf("Attaching server %s to network at: %s as %s\n", 
     s.Name, p.PublicProxyIp, serverFQDN)
 
-  f:= logrus.Fields{
+  f := logrus.Fields{
     "proxy": p.Name, "server": s.Name, "user": s.User,
     "serverFQDN": serverFQDN,
   }
-  log.Info(f, "Attaching server to proxy network.")
+  log.Info(f, "AttachToProxy: Updating Server DNS to point to proxy.")
 
-  // We do it this way, because we are using the session that is releant to 
-  // the proxy. If somehow a different session was attached to the server
-  // I don't think we'd want to use it. ...... Time will tell.
   changeInfo, err = awslib.AttachIpToDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
-  // changeInfo, err = s.AttachToNetwork(p.PublicProxyIp, serverFQDN, comment, p.AWSSession)
   return serverFQDN, changeInfo, err
 }
 
+// Remove DNS entry for Server pointing to this proxy.
+// This looks for a DNS record as created by AttachToProxyNetwork and removes it.
+// Fails if it can't find the DNS record.
 func (p *Proxy) DetachFromProxyNetwork(s *Server) (changeInfo *route53.ChangeInfo, err error) {
 
-  serverFQDN := p.attachedServerFQDN(s)
-  comment := fmt.Sprintf("Detaching server %s from proxy: Removing DNS record for: %s.",
-    s.Name, serverFQDN)
-  changeInfo, err = awslib.DetachFromDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
+  serverFQDN, err  := p.ProxiedServerFQDN(s)
+  if err != nil {
+    err = fmt.Errorf("Failed to obtain DNS for server: %s", err)
+  } else {
+    comment := fmt.Sprintf("Detaching server %s from proxy: Removing DNS record for: %s.",
+      s.Name, serverFQDN)
+    changeInfo, err = awslib.DetachFromDNS(p.PublicProxyIp, serverFQDN, comment, DefaultProxyTTL, p.AWSSession)
+  }
+  f := logrus.Fields{
+    "proxy": p.Name, "server": s.Name, "user": s.User,
+    "serverFQDN": serverFQDN,
+  }
+  log.Info(f, "DetachFromProxy: Updating Server DNS to point to proxy.")
   return changeInfo, err
 }
 
+// Returns the server FQDN constructed from actual DNS for the proxy and the DNSName() from the server.
+// Returns an error if it can't find the DNS for the proxy.
+// serverFQDN does not have a  trailing ".".
+func (p* Proxy) ProxiedServerFQDN(s *Server) (serverFQDN string, err error) {
+  proxyFQDN, _, err := p.PublicDNS()
+  if err == nil {
+    serverFQDN = fmt.Sprintf("%s.%s", s.DNSName(), proxyFQDN)
+  }
+  return strings.TrimSuffix(serverFQDN, "."), err
+}
+
+// This is what we expect to construct proxied server FQDN's out of.
 func (p *Proxy) attachedServerFQDN(s *Server) (string) {
-  return s.DNSName() + "." + p.DomainName()
+  return s.DNSName() + "." + p.DNSName()
 }
 
 //
 // Server DNS
 //
 
+// Returns DNS records that are based on s.DomainName()
+func (s *Server) DNSRecords() ([]*route53.ResourceRecordSet, error) {
+  recordSet, err := awslib.ListDNSRecords(s.DNSName(), s.AWSSession)
+  return recordSet, err
+}
 
-// Does lookups in DNS to find the DNS for this server.
-// OR at least it should/will.
-func (s *Server) DNSAddress() (string) {
-  return s.PublicServerIp + ":" + s.ServerPort.String()
+// TODO: This may all change as we move to shutting down public addresses for
+// servers.
+
+// This will do a DNS lookup for the expected name of the host: s.DNSName().
+// If the record with the right name does not contain the expected address 
+// (s.PublicServerIP) you will get an error. The error message will tell you what was found.
+// In the future we might either let the function return the found values
+// or the error object may have them.
+// Other errors are possibile (e.g. record not found ....)
+func (s *Server) PublicDNS() (fqdn, ipAddress string, err error) {
+  records, err := s.DNSRecords()
+  if err != nil { return fqdn, ipAddress, err }
+
+  fqdn, ipAddress = "<unknown>", "<none>"
+  expectedName := s.DNSName() + "." // the name in records return with the "." at the end.
+  expectedIp := s.PublicServerIp
+
+  var nameR *route53.ResourceRecordSet
+  var nameIp, foundIp string
+  for _, r := range records {
+    // There could be many records that have the same IP as the server (especially when 
+    // it's being managed by a proxy.)
+    if *r.Name == expectedName {
+      nameR = r 
+      for _, rr := range r.ResourceRecords {
+        if *rr.Value == expectedIp {
+          nameIp = *rr.Value
+          break
+        }
+        // Didin't find what we were looking for?
+        if nameIp == "" && len(r.ResourceRecords) > 0 {
+          foundIp = *r.ResourceRecords[0].Value
+        }
+      }
+      break
+    }
+  }
+
+  f := logrus.Fields{
+    "foundDNSRecords": len(records),
+    "server": s.Name,
+    "serverIp": s.PublicServerIp,
+    "expectedName":  expectedName,
+    "expectedIp": expectedIp,
+    "foundName": fqdn,
+    "foundIp": ipAddress,
+  }
+  switch {
+  // Found nothing.
+  case nameR == nil:
+    err = NewDNSError("Failure to find a DNS record for this server", fqdn, []string{})
+    log.Error(f, "Failed to get Server PublicDNS: No matching DNS.", err)
+  // Found a record based on the name, but got something other than the expected ip.
+  case foundIp != "":
+    f["foundName"] = *nameR.Name
+    f["foundIp"] = foundIp
+    err = NewDNSErrorAWS("Unexpected IP address: found name but different ip", *nameR.Name, nameR.ResourceRecords)
+    log.Error(f, "Failed to get Server PublicDNS: Unexpected IP address.", err)
+  // Found a name but no ip. This really shouldn't happen in the normal course of things.
+  case nameIp == "": 
+    f["foundName"] = *nameR.Name
+    err = NewDNSErrorAWS("No IP Address: found name but no IP address", *nameR.Name, nameR.ResourceRecords)
+    log.Error(f, "Failed to get Server PublicDNS: No IP address.", err)
+  default:
+    fqdn = *nameR.Name
+    ipAddress = nameIp
+    f["foundName"] = *nameR.Name
+    f["foundIp"] = nameIp
+    log.Info(f, "Retrieved Server DNS.")
+  }
+  return fqdn, ipAddress, err
 }
 
 // Name suitable for adding to a DNS address
-// Spaces removed and lowercased.
 func (s *Server) DNSName() (string) {
-  return nameToDNSForm(s.SafeServerName())
+  return nameToDNSForm(s.Name)
 }
 
-// Used on it's own in naming the server for a proxy.
-// But also in DNS.
-func (s *Server) SafeServerName() (string) {
-  name := strings.Replace(s.Name, " ", "-", -1)
-  return name
-}
+//
+// Shared Helpers
+//
 
 // Remove spaces and all lower case.
 func nameToDNSForm(n string) (string) {

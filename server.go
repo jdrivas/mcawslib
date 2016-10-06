@@ -330,43 +330,52 @@ func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Cont
   return c, ok
 }
 
+// Returns the IP and the Port.
 func (s *Server) PublicServerAddress() (string) {
   return s.PublicServerIp + ":" + s.ServerPort.String()
 }
 
+// Returned the IP and the port
 func (s *Server) RconAddress() (string) {
   return s.PrivateServerIp + ":" + s.RconPort.String()
 }
 
+// Convenience to check the DeepTask and DeepTask.Task for non-null
 func (s *Server) checkForNullTask() (bool) {
   return s == nil || s.DeepTask == nil || s.DeepTask.Task == nil
 }
 
+// Gets the LastStaus from DeepTask.Task
 func (s *Server) ServerTaskStatus() (string) {
   if s.checkForNullTask() { return "---" }
   return *s.DeepTask.Task.LastStatus
 }
 
+// The container the Server is running in.
 func (s *Server) ServerContainer() (*ecs.Container, bool) {
   return getContainerFromNames(GetServerContainerNames(), s.DeepTask)
 }
 
+// The Container the ServerController is running in.
 func (s *Server) ControllerContainer() (*ecs.Container, bool) {
   return getContainerFromNames(GetControllerContainerNames(), s.DeepTask)
 }
 
-// Returns the containers environment (Update env actually.).
+// Returns the Server containers environment (Update env actually).
 // Ok is false if the Server container couldn't be found.
 func (s *Server) ServerEnvironment() (cenv map[string]string, ok bool) {
   if s.checkForNullTask() { return cenv, ok }
   return s.DeepTask.EnvironmentFromNames(GetServerContainerNames())
 }
 
+// Returns the Controller Containers environment (Update env actually).
+// Ok is false if the container couldn't be found.
 func (s *Server) ControllerEnvironment() (cenv map[string]string, ok bool) {
   if s.checkForNullTask() { return cenv, ok }
   return s.DeepTask.EnvironmentFromNames(GetControllerContainerNames())
 }
 
+// Status of the Server Container (ecs LastStatus)
 func (s *Server) ServerContainerStatus() string {
   status := "---"
   if s.checkForNullTask()  { return status }
@@ -377,6 +386,7 @@ func (s *Server) ServerContainerStatus() string {
   return status
 }
 
+// Status of the Controller Container (ecs Last Status)
 func (s *Server) ControllerContainerStatus() string {
   status := "---"
   if s.checkForNullTask()  { return status }
@@ -387,14 +397,17 @@ func (s *Server) ControllerContainerStatus() string {
   return status
 }
 
+// Uptime  of the server task nicely formatted (awslib.UptimeString())
 func (s *Server) UptimeString() (string) {
   return s.DeepTask.UptimeString()
 }
 
+// Uptime of the server task.
 func (s *Server) Uptime() (time.Duration, error) {
   return s.DeepTask.Uptime()
 }
 
+// The type of craft server running, from the container's environment.
 func (s *Server) CraftType() (string) {
   env, ok := s.ServerEnvironment()
   if !ok { return "<unknown-type>" }
@@ -403,6 +416,7 @@ func (s *Server) CraftType() (string) {
   return serverType
 }
 
+// Convenience to provide fields all filed out for logging actions on this server.
 func (s *Server) LogFields() (logrus.Fields) {
   cluster := "<none>"
   if s.ClusterName != "" { cluster = s.ClusterName }
