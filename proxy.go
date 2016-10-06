@@ -238,7 +238,7 @@ func (p *Proxy) RemoveServerAccess(s *Server) (error) {
   }
   log.Info(f, "Removing server from  proxy (proxy access and forced-host)")
 
-  found, err := p.isServerProxied(s)
+  found, err := p.IsServerProxied(s)
   if err != nil { return err }
   if !found { 
     err = fmt.Errorf("Server: %s not with this proxy: %s.", s.Name, p.Name)
@@ -339,7 +339,7 @@ func (p* Proxy) StopProxyForServer(s *Server) (error) {
   return err
 }
 
-func (p *Proxy) isServerProxied(s *Server) (bool, error) {
+func (p *Proxy) IsServerProxied(s *Server) (bool, error) {
   serverNames, err := p.ServerNames()
   if err != nil { return false, err }
   found := false
