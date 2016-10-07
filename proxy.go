@@ -200,9 +200,13 @@ func (p *Proxy) GetRcon() (rcon *Rcon, err error) {
 // through the proxy.
 func (p *Proxy) AddServerAccess(s *Server) (err error) {
   f:= logrus.Fields{
-    "proxy": p.Name, "server": s.Name, "user": s.User,
+    "proxy": p.Name, "server": s.Name, "user": s.User, "serverAddress": s.PublicServerAddress(),
   }
   log.Info(f, "Adding server access to proxy.")
+
+  if s.ServerPort == 0 {
+    return fmt.Errorf("Failed to add server: invalid server port = (%d)", s.ServerPort)
+  }
 
   rcon, err := p.GetRcon()
   if err != nil { return err }
@@ -224,6 +228,12 @@ func (p *Proxy) AddServerAccess(s *Server) (err error) {
   log.Info(f, "Remote addServer reply.")
 
   return err
+}
+
+// The underying API in Bungee allows add to work as update.
+// So if you add a new one, that will replace the old one.
+func (p *Proxy) UpdateServerAccess(s *Server) (err error) {
+  return p.AddServerAccess(s)
 }
 
 

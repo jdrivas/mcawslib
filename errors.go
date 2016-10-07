@@ -6,8 +6,8 @@ import (
 
   "github.com/aws/aws-sdk-go/service/route53"
 
-  "awslib"
-  // "github.com/jdrivas/awslib"
+  // "awslib"
+  "github.com/jdrivas/awslib"
 )
 
 type DNSError struct {

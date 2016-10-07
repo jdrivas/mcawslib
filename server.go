@@ -238,11 +238,20 @@ func GetServer(clusterName, taskArn string, sess *session.Session) (s *Server, e
   if err != nil { return s, fmt.Errorf("Failed to get Server information: %s", err) }
   dt := dtm[taskArn]
   s, ok := GetServerFromTask(dt, sess)
+  s.ClusterName = clusterName
 
   if !ok {
     err = fmt.Errorf("Error finding server for %s/%s : %s", clusterName, taskArn, err)
   }
   return s, err
+}
+
+// Get a server (probably recently launced) but wait until the task is running, ensuring
+// we have things like allocated ports.
+func GetServerWait(clusterName, taskArn string, sess *session.Session) (s *Server, err error) {
+  err = awslib.WaitForTaskRunning(clusterName, taskArn, sess)
+  if err != nil { return s, fmt.Errorf("Failed to wait for task: s", err) }
+  return GetServer(clusterName, taskArn, sess)
 }
 
 func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err error) {
@@ -329,6 +338,8 @@ func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Cont
   }
   return c, ok
 }
+
+
 
 // Returns the IP and the Port.
 func (s *Server) PublicServerAddress() (string) {
