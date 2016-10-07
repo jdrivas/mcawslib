@@ -2,6 +2,7 @@ package mclib
 
 import(
   "fmt"
+  "sort"
   "time"
 )
 
@@ -63,8 +64,21 @@ func (s *Server) SafeArchiveThenPublish(files []string, aType ArchiveType) ( res
 // Convenience wrapper around GetArchives and then pulling the snaps
 // from them. See archiveDB.
 func (s *Server) GetServerSnapshots() (snaps []Archive, err error) {
-  snaps, err = GetArchivesFor(ServerSnapshot, s.User, s.Name, s.AWSSession)
+  snaps, err = GetArchivesForServer(ServerSnapshot, s.User, s.Name, s.ArchiveBucket, s.AWSSession)
   return snaps, err
+}
+
+func (s *Server) GetWorldSnapshots() (snaps []Archive, err error){
+  snaps, err = GetArchivesForServer(WorldSnapshot, s.User, s.Name, s.ArchiveBucket, s.AWSSession)
+  return snaps, err
+}
+
+func (s *Server) GetLatestWorldSnapshot() (snap Archive, err error) {
+  snaps, err  := s.GetWorldSnapshots()
+  if err != nil { return snap, fmt.Errorf("Failed to get most recent world backup: %s", err) }
+  sort.Sort(ByLastMod(snaps))
+  snap = snaps[len(snaps)-1]
+  return snap, err
 }
 
 // A Snapshot is a zipfile (archive file) published to the SnapshotPath (archived) on the remote

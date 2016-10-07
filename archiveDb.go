@@ -71,6 +71,10 @@ func NewArchive(t ArchiveType, userName, serverName string, bucketName string, o
   return a
 }
 
+func (a Archive) URI() (uri string) {
+  return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", a.Bucket, a.S3Key())
+}
+
 func (a Archive) S3Key() (k string) {
   if a.S3Object == nil {
     k = "NO-REFERENCE-TO-S3-OBJECT"
@@ -119,11 +123,7 @@ func (a ByBucket) Less(i, j int) bool { return a[i].Bucket < a[j].Bucket }
 // ArchiveMap
 //
 
-// TODO: Looks like the archive map came too soon.
-// Let's remove on the next pass and just use type Archives []archive
-// We can add GetAllArchives(...) (ArchiveMap) later if we need it.
-// Keyed on user name.
-type ArchiveMap map[string][]Archive
+type ArchiveMap map[string]map[string][]Archive
 
 func NewArchiveMap() (ArchiveMap) {
   return make(ArchiveMap)
@@ -131,6 +131,7 @@ func NewArchiveMap() (ArchiveMap) {
 
 // Gets all of the archives for a user. Returns them in an ArchiveMap for convenience.
 func GetArchives(userName, bucketName string, session *session.Session) (archives ArchiveMap, err error) {
+
   // TODO: move this to awslib.
   // GetObjectList(string bucketName, preFix) ([]*s3.Object)
   // You might consider returning a map of ([string]*s3.Object), keyed on  the storage key.
@@ -202,42 +203,50 @@ func (am ArchiveMap) String() (s string) {
 }
 
 func (am ArchiveMap) Add(a Archive) {
-  alist, ok := am[a.UserName] 
-  if ok {
-    am[a.UserName] = append(alist, a)
+
+  // Get the byServerMap of Archives
+  byServerMap, ok := am[a.UserName] 
+  if !ok { 
+    am[a.UserName] = make(map[string][]Archive)
+    byServerMap = am[a.UserName]
+  }
+
+  // Get the archive list from it and add the archive.
+  aList, ok  := byServerMap[a.ServerName]
+  if ok { 
+    byServerMap[a.ServerName] = append(aList, a) 
   } else {
-    am[a.UserName] = []Archive{a}
+    byServerMap[a.ServerName] = []Archive{a}
   }
 }
 
 
 // General filter for archive based on archive type.
 func (am ArchiveMap) GetArchives(userName string, t ArchiveType) (archiveList []Archive) {
-  archives := am[userName]
-  switch t {
-  case ServerSnapshot, WorldSnapshot:
-    archiveList = make([]Archive,0, len(archives)/2)
-  case MiscSnapshot:
-    archiveList = make([]Archive, 0, 50)
-  default: // Should we even be here? Should I panic if we get here?
-    archiveList = make([]Archive, 0, 0)
-  }
-
-  for _, archive := range archives {
-    if archive.Type == t {
-      archiveList = append(archiveList, archive)
+  byServerMap := am[userName]
+  archiveList = make([]Archive,0,0)
+  for _, aList := range byServerMap {
+    for _, archive := range aList {
+      if archive.Type == t {
+        archiveList = append(archiveList, archive)
+      }
     }
   }
   return archiveList
 }
 
-
+// Filter to just get the list of archives for a server.
+func (am ArchiveMap) GetArchivesForServer(userName, serverName string, t ArchiveType) (archiveList []Archive) {
+  byServerMap := am[userName]
+  al := byServerMap[serverName]
+  return al
+}
 
 // Convienence to filter on type before you have an Archive Map. (calls GetArchives and appropriate filter.)
-func GetArchivesFor(t ArchiveType, userName, bucketName string, session *session.Session) (snaps []Archive, err error) {
+func GetArchivesForServer(t ArchiveType, userName, serverName, bucketName string, session *session.Session) (snaps []Archive, err error) {
   am, err := GetArchives(userName, bucketName, session)
   if err == nil {
-    snaps = am.GetArchives(userName, t)
+    snaps = am.GetArchivesForServer(userName, serverName, t)
   }
   return snaps, err
 }

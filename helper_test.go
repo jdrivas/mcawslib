@@ -132,9 +132,6 @@ func randomUniqueUserNames(numOfUsers int) (names []string){
   return names
 }
 
-
-
-
 func TestRandomUniqueUsers(t *testing.T) {
   count := 100
   nameSet := make(map[string]bool, count)

@@ -9,12 +9,6 @@ import (
   "github.com/stretchr/testify/assert"
 )
 
-func newArchiveMap(size, noOfUsers int) {
-  // am := new(ArchiveMap)
-  for i := 0; i < size; i++ {
-
-  }
-}
 
 func TestArchiveStringNoObject (t *testing.T) {
   s := testServer(t, false)
@@ -98,19 +92,32 @@ func TestGetSnapshots (t *testing.T) {
   user := users[rand.Int() % numUniqueUsers]
   archiveMap := make(ArchiveMap, iters)
   for i := 1; i < iters; i++ {
+
+    // Get a user
     un := users[rand.Int() % len(users)]
     _, ok := userSet[un]
     if !ok {userSet[un] = true} // track how many unique users we added to the map.
-    sn := fmt.Sprintf("%s-TestServer",un )
+
+    // and a server
+    var sn string
+    if rand.Int() % 2 == 0 {
+      sn = fmt.Sprintf("%s-TestServer-1", un )
+    } else {
+      sn = fmt.Sprintf("%s-TestServer-2", un)
+    }
     s := testServer(t, true)
+    s.Name = sn
+
+    // Pick an archive type
     t := getRandomArchiveType()
     if t == ServerSnapshot && un == user {snapCount++}
     path, _ := s.archivePath(ServerSnapshot)
 
+    // Add the archive to the map.
     a := NewArchive(t, un, sn, "test-bucket", testS3Object(path))
     archiveMap.Add(a)
   }
-  assert.Len(t, archiveMap, len(userSet), "ArchiveMap didn't add enough archives.")
+  assert.Len(t, archiveMap, len(userSet), "ArchiveMap didn't add the right number of archives.")
   snaps := archiveMap.GetArchives(user, ServerSnapshot)
   assert.Len(t, snaps, snapCount, "Didn't get the right number of snapshots back.")
 }
