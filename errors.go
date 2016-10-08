@@ -5,6 +5,7 @@ import (
   "strings"
 
   "github.com/aws/aws-sdk-go/service/route53"
+  "github.com/aws/aws-sdk-go/service/ecs"
 
   // "awslib"
   "github.com/jdrivas/awslib"
@@ -41,4 +42,26 @@ func NewDNSErrorAWS(message, dnsName string, resources []*route53.ResourceRecord
 
 func (e DNSError) Error() string {
   return fmt.Sprintf("%s: %s(%s)", e.Message, e.DNSName, strings.Join(e.IpAddresses, ","))
+}
+
+type TaskError struct {
+  Message string
+  Tasks []*ecs.Task
+  Failures []*ecs.Failure
+}
+
+func NewEmptyTaskError(mesg string) (*TaskError) {
+  return NewTaskError(mesg, []*ecs.Task{}, []*ecs.Failure{})
+}
+
+func NewTaskError(mesg string, tasks []*ecs.Task, fails []*ecs.Failure) (*TaskError) {
+  return &TaskError{
+    Message: mesg,
+    Tasks: tasks,
+    Failures: fails,
+  }
+}
+
+func (e *TaskError) Error() string {
+  return fmt.Sprintf("%s: Errors(%d), Failures (%d)", e.Message, len(e.Tasks), len(e.Failures))
 }

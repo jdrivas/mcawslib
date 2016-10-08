@@ -60,6 +60,7 @@ const (
   ArchiveRegionKey = "CRAFT_ARCHIVE_REGION"
   ArchiveBucketKey = "ARCHIVE_BUCKET"
   ServerLocationKey = "SERVER_LOCATION"
+  ClusterNameKey = "CLUSTER_NAME"
   // This is where server files are located relative to 
   // the controller.
   ServerLocationDefault = "." 

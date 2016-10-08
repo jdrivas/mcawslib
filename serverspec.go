@@ -4,6 +4,7 @@ import(
   "fmt"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/ecs"
+  "github.com/Sirupsen/logrus"
 
   // "awslib"
   "github.com/jdrivas/awslib"
@@ -28,6 +29,7 @@ type ServerTaskEnv map[string]ContainerEnv
 
 type ServerSpec struct {
   TaskDefinition *ecs.TaskDefinition
+  Cluster string
   ServerTaskEnv ServerTaskEnv
   AWSSession *session.Session
   ServerConatinerName string
@@ -43,28 +45,100 @@ const(
 // TODO: Consider adding the TD register function here, or providing
 // some kind of plug-in to ecs-pilot to validate TDs.
 // TODO: validate new server names (upperlowercase, no punct but - and _)??
-func NewServerSpec(userName, serverName, region, bucketName, tdArn string, 
+func NewServerSpec(userName, serverName, region, bucketName, cluster, tdArn string, 
   sess *session.Session) (ss ServerSpec, err error) {
 
   td, err := awslib.GetTaskDefinition(tdArn, sess)
   if err != nil { return ss, err }
   ste := make(ServerTaskEnv,2)
-  ste[CraftServerContainerKey] = DefaultProxiedServerTaskEnv(userName, serverName, region)
-  ste[CraftControllerContainerKey] = DefaultControllerTaskenv(userName, serverName, region, bucketName)
+  ste[CraftServerContainerKey] = DefaultProxiedServerTaskEnv(userName, serverName, cluster, region)
+  ste[CraftControllerContainerKey] = DefaultControllerTaskenv(userName, serverName, cluster, region, bucketName)
   ss = ServerSpec{
     TaskDefinition: td,
+    Cluster: cluster,
     ServerTaskEnv: ste,
     AWSSession: sess,
   }
   return ss, err
 }
 
-func (s ServerSpec) ServerContainerEnv() (ContainerEnv) {
-  return s.ServerTaskEnv[CraftServerContainerKey]
+func (ss *ServerSpec) defaultLogFields() (logrus.Fields) {
+  return logrus.Fields{
+    "cluster": ss.Cluster, "TaskDefinition": *ss.TaskDefinition.TaskDefinitionArn,
+    "userName": ss.UserName(), "serverName": ss.ServerName(),
+    "archiveRegion": ss.ArchiveRegion(), "bucketName": ss.BucketName(),
+  }
 }
 
-func (s ServerSpec) ControllerContainerEnv() (ContainerEnv) {
-  return s.ServerTaskEnv[CraftServerContainerKey]
+
+// If returned, the error will be a TaskError
+func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
+
+  f := ss.defaultLogFields()
+
+  controlEnv := ss.ControllerContainerEnv()
+  if controlEnv[ArchiveBucketKey] == "" {
+    controlEnv[ArchiveBucketKey] = MinecraftServerDefaultArchiveBucket
+  }
+
+  env, err := ss.ContainerEnvironmentMap()
+  if err != nil { return s, NewEmptyTaskError(err.Error()) }
+
+  // Launch the task.
+  resp, err := awslib.RunTaskWithEnv(ss.Cluster, *ss.TaskDefinition.TaskDefinitionArn, env, ss.AWSSession)
+  if err != nil { 
+    log.Error(f, "Failed to launch server from ServerSpec.", err)
+    mesg := fmt.Sprintf("Error launching server: %s", err)
+    return s, NewEmptyTaskError(mesg)
+  }
+  taskArn := *resp.Tasks[0].TaskArn
+
+
+  if len(resp.Tasks) > 1 || len(resp.Failures) > 0 { 
+    var mesg string
+    switch {
+    case len(resp.Tasks) > 1 && len(resp.Failures) > 0:
+      mesg = fmt.Sprintf("More than one Task (expected 1) (%d) and Failures returned (%d)",
+        len(resp.Tasks), len(resp.Failures))
+    case len(resp.Tasks) > 1:
+      mesg = fmt.Sprintf("More than one Task (expected 1) (%d)", len(resp.Tasks))
+    case len(resp.Failures) > 0:
+      mesg = fmt.Sprintf("Failures returned (%d)", len(resp.Failures))
+    }
+    mesg = fmt.Sprintf("%s. However, server task has been launched.", mesg)
+    err = NewTaskError(mesg, resp.Tasks, resp.Failures)  
+    f["noOfTasks"] = len(resp.Tasks)
+    f["noOfFailures"] = len(resp.Failures)
+    log.Error(f, "Error creating server task.", err)
+    return s, err
+  }
+
+  s, err = GetServer(ss.Cluster, taskArn, ss.AWSSession)
+  return s, err
+}
+
+func (ss *ServerSpec) ServerContainerEnv() (ContainerEnv) {
+  return ss.ServerTaskEnv[CraftServerContainerKey]
+}
+
+func (ss *ServerSpec) ControllerContainerEnv() (ContainerEnv) {
+  return ss.ServerTaskEnv[CraftServerContainerKey]
+}
+
+func (ss *ServerSpec) UserName() (string) {
+  return ss.ServerContainerEnv()[ServerUserKey]
+}
+
+func (ss *ServerSpec) ServerName() (string) {
+  return ss.ServerContainerEnv()[ServerNameKey]
+}
+
+func (ss *ServerSpec) ArchiveRegion() (string) {
+  return ss.ControllerContainerEnv()[ArchiveRegionKey]
+}
+
+func (ss *ServerSpec) BucketName() (string) {
+  return ss.ControllerContainerEnv()[ArchiveBucketKey]
 }
 
 // This takes the environments that we have been indexing on "role" (be careful this isn't 
@@ -72,7 +146,7 @@ func (s ServerSpec) ControllerContainerEnv() (ContainerEnv) {
 // We look for the role Environment variable in the ContainerDefinition 
 // and take the container name from that ContainerDefinition.
 // Which we then use build out the CEM from specs environment.
-func (s ServerSpec) ContainerEnvironmentMap() (cem awslib.ContainerEnvironmentMap, err error) {
+func (s *ServerSpec) ContainerEnvironmentMap() (cem awslib.ContainerEnvironmentMap, err error) {
 
   td := s.TaskDefinition
   serverContainerName, ok  := ContainerNameForRole(CraftServerRole, td)
@@ -109,18 +183,19 @@ func ContainerNameForRole(r string, td *ecs.TaskDefinition) (n string, ok bool) 
 }
 
 
-func DefaultProxiedServerTaskEnv(userName, serverName, region string) ContainerEnv {
-  cenv := DefaultServerTaskEnv(userName, serverName, region)
+func DefaultProxiedServerTaskEnv(userName, serverName, cluster, region string) ContainerEnv {
+  cenv := DefaultServerTaskEnv(userName, serverName, cluster, region)
   cenv[OnlineModeKey] = ProxiedServerOnlineModeDefault
   return cenv
 }
 
 // Region not taken from SESS to enable delployments from other regions.
-func DefaultServerTaskEnv(userName, serverName , region string) ContainerEnv {
+func DefaultServerTaskEnv(userName, serverName , cluster, region string) ContainerEnv {
   cenv := ContainerEnv{
     RoleKey: CraftServerRole,
     ServerUserKey: userName,
     ServerNameKey: serverName,
+    ClusterNameKey: cluster,
     OpsKey: userName,
     // "WHITELIST": "",
     ModeKey: ModeDefault,
@@ -147,7 +222,7 @@ func DefaultServerTaskEnv(userName, serverName , region string) ContainerEnv {
   return cenv
 }
 
-func DefaultControllerTaskenv(userName, serverName, region, bucketName string) ContainerEnv {
+func DefaultControllerTaskenv(userName, serverName, cluster, region, bucketName string) ContainerEnv {
   // Set AWS_REGION to pass the region automatically
   // to the minecraft-controller. The AWS-SDK looks for this
   // env when setting up a session (this also plays well with
@@ -163,6 +238,7 @@ func DefaultControllerTaskenv(userName, serverName, region, bucketName string) C
     ArchiveRegionKey: region,
     ArchiveBucketKey: bucketName,
     ServerLocationKey: ServerLocationDefault,
+    ClusterNameKey: cluster,
     "AWS_REGION": region,
   }  
   return cenv
