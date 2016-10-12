@@ -46,7 +46,7 @@ func TestArchivePath(t *testing.T) {
 // Full path Spec
 // http://s3.amazonaws.com/<bucket>/<user>/<server>/<archive-type-string>/<RFC3339-time>-<user>-server-<archive-ext>
 func TestSnapshotPath(t *testing.T) {
-  bucket := "craft-config-test"
+  bucket := DefaultTestBucket
   user := randUserName()
   server := fmt.Sprintf("%s", randServerName()) 
   aType := ServerSnapshot

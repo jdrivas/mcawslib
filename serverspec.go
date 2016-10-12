@@ -70,7 +70,6 @@ func (ss *ServerSpec) defaultLogFields() (logrus.Fields) {
   }
 }
 
-
 // If returned, the error will be a TaskError
 func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
 
@@ -114,6 +113,9 @@ func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
   }
 
   s, err = GetServer(ss.Cluster, taskArn, ss.AWSSession)
+  f["serverType"] = s.CraftType()
+  f["taskArn"] = taskArn
+  log.Info(f, "Launched server.")
   return s, err
 }
 

@@ -98,25 +98,42 @@ func (a Archive) String() (string) {
 
 
 // Soring Interface
-type ByLastMod []Archive
-func (a ByLastMod) Len() int { return len(a) }
-func (a ByLastMod) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByLastMod) Less(i, j int) bool { return a[i].LastMod().Before(a[j].LastMod()) }
+// These are all used: sort.Sort(ByLasMod(myArchiveList))
+func ByLastMod(aList []Archive) (archiveSort) {
+  return archiveSort{ 
+    as: aList, 
+    less: func(aI, aJ *Archive) (bool) { return aI.LastMod().Before(aJ.LastMod())},
+  }
+}
 
-type ByUser []Archive
-func (a ByUser) Len() int { return len(a) }
-func (a ByUser) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByUser) Less(i, j int) bool { return a[i].UserName < a[j].UserName }
+func ByType(aList []Archive) (archiveSort) {
+  return archiveSort{
+    as: aList,
+    less: func(aI, aJ *Archive) bool { return aI.Type.String() < aJ.Type.String() },
+  }
+}
 
-type ByType []Archive
-func (a ByType) Len() int { return len(a) }
-func (a ByType) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByType) Less(i, j int) bool { return a[i].Type < a[j].Type }
+func ByUser(aList []Archive) (archiveSort) {
+  return archiveSort{
+    as: aList,
+    less: func(aI, aJ *Archive) bool { return aI.UserName < aJ.UserName } ,
+  }
+}
 
-type ByBucket []Archive
-func (a ByBucket) Len() int { return len(a) }
-func (a ByBucket) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a ByBucket) Less(i, j int) bool { return a[i].Bucket < a[j].Bucket }
+func ByBucket(aList []Archive) (archiveSort) {
+  return archiveSort{
+    as: aList,
+    less: func(aI, aJ *Archive) bool { return aI.Bucket < aJ.Bucket },
+  }
+}
+
+type archiveSort struct {
+  as []Archive
+  less func( aI, aJ *Archive) (bool)
+}
+func (a archiveSort) Len() int { return len(a.as) }
+func (a archiveSort) Swap(i, j int) { a.as[i], a.as[j] = a.as[j], a.as[i] }
+func (a archiveSort) Less(i, j int) bool { return a.less( &a.as[i], &a.as[j]) }
 
 
 // 

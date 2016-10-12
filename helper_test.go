@@ -11,6 +11,8 @@ import (
   "github.com/stretchr/testify/assert"
 )
 
+const DefaultTestBucket = "momentlabs-test"
+
 func init() {
   // If you want to repeat a test run with the same values over
   // and over again, just remove this ... or you can give it 
@@ -54,7 +56,7 @@ var server = &Server{
     ServerPort: 25565, 
     RconPort: 25575, 
     RconPassword: "testing",
-    ArchiveBucket: "craft-config-test", 
+    ArchiveBucket: DefaultTestBucket, 
     ServerDirectory: "server",
     TaskArn: &taskArn,
 }
@@ -68,7 +70,7 @@ func testServer(t *testing.T, useRcon bool) (s *Server) {
     ServerPort: 25565, 
     RconPort: 25575, 
     RconPassword: "testing",
-    ArchiveBucket: "craft-config-test", 
+    ArchiveBucket: DefaultTestBucket, 
     ServerDirectory: "server",
     TaskArn: &taskArn,
   }

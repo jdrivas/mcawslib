@@ -104,15 +104,16 @@ func (s *Server ) archivePath(aType ArchiveType) (string, error){
 
 func(s *Server) serverSnapshotFiles() []string {
   files := []string{
-    "config",
-    "logs",
-    "mods",
-    "world",
-    "banned-ips.json",
-    "banned-players.json",
-    "server.properties",
-    "usercache.json",
-    "whitelist.json",
+    ".",
+    // "config",
+    // "logs",
+    // "mods",
+    // "world",
+    // "banned-ips.json",
+    // "banned-players.json",
+    // "server.properties",
+    // "usercache.json",
+    // "whitelist.json",
   }
   return files
 }

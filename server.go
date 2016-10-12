@@ -424,7 +424,7 @@ func (s *Server) CraftType() (string) {
   env, ok := s.ServerEnvironment()
   if !ok { return "<unknown-type>" }
   serverType, ok := env[TypeKey]
-  if !ok { serverType = "Vanila" }
+  if !ok { serverType = "Vanilla" }
   return serverType
 }
 
