@@ -113,18 +113,22 @@ func CreateServerArchive(fileNames []string, directoryName, zipfileName string) 
   log.Debug(f, "Saving files to archive")
   for _, fileName := range fileNames {
     err = writeFileToZip("", fileName, archive)
-    if err != nil {return fmt.Errorf("ArchiveServer: can't write file \"%s\" to archive: %s", fileName, err)}
+    if err != nil {
+      return fmt.Errorf("ArchiveServer: can't write file \"%s\" to archive: %s", fileName, err)
+    }
   }
   return err
 }
 
 // This currently errors on unfound files and directories.
-// TODO: consider if we want to allow for missings files to be noted but not 
+// TODO: consider if we want to allow for missing files to be noted but not 
 //shutdown everything.  
 func writeFileToZip(baseDir, fileName string, archive *zip.Writer) (err error) {
 
   err = filepath.Walk(fileName, func(path string, info os.FileInfo, err error) (error) {
-    if err != nil { return err }
+    if err != nil { 
+      return fmt.Errorf("filepath.Walk called the cb with an error (start: %s path: %s, info: %#v error: %s", fileName, path, info, err) 
+    }
 
     header, err := zip.FileInfoHeader(info)
     if err != nil { return fmt.Errorf("Couldn't convert FileInfo into zip header: %s", err) }
