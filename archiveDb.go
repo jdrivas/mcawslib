@@ -9,8 +9,8 @@ import(
   "github.com/aws/aws-sdk-go/service/s3"
   "github.com/Sirupsen/logrus"
 
-  "awslib"
-  // "github.com/jdrivas/awslib"
+  // "awslib"
+  "github.com/jdrivas/awslib"
 )
 
 // 
