@@ -140,6 +140,7 @@ func (a archiveSort) Less(i, j int) bool { return a.less( &a.as[i], &a.as[j]) }
 // ArchiveMap
 //
 
+// A list of archives indexed by 
 type ArchiveMap map[string]map[string][]Archive
 
 func NewArchiveMap() (ArchiveMap) {
@@ -360,7 +361,13 @@ func archivePath(user, server string, aType ArchiveType) (string) {
 
 // the files names are: <time>-<user>-<server>-<archiveExt>
 func archiveFileName(user, server string, when time.Time, aType ArchiveType) (string) {
-  timeString := when.Format(time.RFC3339)
+  if user == "" {
+    user = "<no-user>"
+  }
+  if server == "" {
+    server = "<no-server>"
+  }
+  timeString := when.Format(FormatForTimeName)
   return timeString + "-" + user + "-" + server + typeToFileExt[aType]
 }
 

@@ -61,6 +61,7 @@ const (
   ArchiveBucketKey = "ARCHIVE_BUCKET"
   ServerLocationKey = "SERVER_LOCATION"
   ClusterNameKey = "CLUSTER_NAME"
+  TaskArnKey = "TASK_ARN"
   // This is where server files are located relative to 
   // the controller.
   ServerLocationDefault = "." 

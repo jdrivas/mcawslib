@@ -16,6 +16,8 @@ import(
   "github.com/Sirupsen/logrus"
 )
 
+const FormatForTimeName = time.RFC3339
+
 type PublishedArchiveResponse struct {
   ArchiveFilename string
   BucketName string
@@ -28,10 +30,9 @@ type PublishedArchiveResponse struct {
 // Create a zipfile (archive) at the serverDirectory and publish it to publishPath on S3.
 func ArchiveAndPublish(rcon *Rcon, fileNames []string, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
-  archiveFileName := fmt.Sprintf("archive-%s.zip", time.Now())
+  archiveFileName := fmt.Sprintf("archive-%s.zip", time.Now().Format(FormatForTimeName))
   archivePath := filepath.Join(archiveDir, archiveFileName)
 
-  log.Info(logrus.Fields{"archiveDir": serverDirectory, "bucket": bucketName, "publishPath": publishPath}, "Creating Archive.")
 
   err = ArchiveServer(rcon, fileNames, serverDirectory, archivePath)
   if err != nil { return nil, err }
@@ -44,7 +45,12 @@ func ArchiveAndPublish(rcon *Rcon, fileNames []string, serverDirectory, bucketNa
 // When the archive is finished use rcon to save-on.
 // If rcon is nil, then don't do the save-off/save-all/save-on (not for production).
 func ArchiveServer(rcon *Rcon, fileNames []string, serverDirectory string, archiveFileName string) (err error) {
-
+  f := logrus.Fields{
+    "archivedFiles": strings.Join(fileNames,", "),
+    "archivedDir": serverDirectory, 
+    "archiveFilename": archiveFileName,
+  }
+  log.Info(f, "Creating Archive.")
   if rcon != nil {
     _, err = rcon.SaveAll()
     if err != nil { return err }
@@ -63,7 +69,7 @@ func ArchiveServer(rcon *Rcon, fileNames []string, serverDirectory string, archi
     }
   }
 
-  log.Info(logrus.Fields{"dir": serverDirectory, "archive": archiveFileName},"Archived server.")
+  log.Info(f,"Archived server.")
   return err
 }
 
@@ -73,7 +79,13 @@ func ArchiveServer(rcon *Rcon, fileNames []string, serverDirectory string, archi
 // a better or different way.
 func CreateServerArchive(fileNames []string, directoryName, zipfileName string) (err error) {
 
-  log.Debug(logrus.Fields{"dir": directoryName, "archive": zipfileName,}, "Archiving server.")
+  files := strings.Join(fileNames,", ")
+  f := logrus.Fields{
+    "archiveDir": directoryName, 
+    "archiveFiles:": files,
+    "archiveName": zipfileName,
+  }
+  log.Debug(f, "Archiving server.")
   zipFile, err := os.Create(zipfileName)
   if err != nil { return fmt.Errorf("CreateArchiveServer: can't open zipfile %s: %s", zipfileName, err) }
   defer zipFile.Close()
@@ -93,10 +105,10 @@ func CreateServerArchive(fileNames []string, directoryName, zipfileName string) 
   err = dir.Chdir()
   if err != nil { return fmt.Errorf("CreativeArchiveServer: can't change to server directory %s: %s", directoryName, err) }
 
-  log.Debug(logrus.Fields{"length": len(fileNames),}, "Saving files to archive")
+  f["length"] = len(fileNames)
+  log.Debug(f, "Saving files to archive")
   for _, fileName := range fileNames {
     err = writeFileToZip("", fileName, archive)
-    // err = writeFileToZip(directoryName, fileName, archive)
     if err != nil {return fmt.Errorf("ArchiveServer: can't write file \"%s\" to archive: %s", fileName, err)}
   }
   return err
@@ -148,6 +160,14 @@ func PublishArchive(archiveFileName string, bucketName string, path string, sess
   // TODO: it may be good to remove this, but as we were having trouble with
   // sessions for a minute there, the resulting panic wasn't helping, though it's
   // probably the right behavior.
+
+  f := logrus.Fields{
+    "archiveFile": archiveFileName, 
+    "bucket": bucketName, 
+    "key": path,
+  }
+  log.Info(f, "Publishing Archive.")
+
   if sess == nil {return nil, fmt.Errorf("PublishArchive can't have a nil session.Session")}
   s3svc := s3.New(sess)
   file, err := os.Open(archiveFileName)
@@ -164,22 +184,16 @@ func PublishArchive(archiveFileName string, bucketName string, path string, sess
   if err != nil {return nil, fmt.Errorf("PublishArchive: Couldn't read archive file: %s: %s", archiveFileName, err)}
   fileBytes := bytes.NewReader(buffer)
 
-  log.Debug(logrus.Fields{
-    "archiveFile": archiveFileName, 
-    "bytes": fileSize, 
-    "fileType": fileType, 
-    "bucket": bucketName, 
-    "archive": path}, "PublishArchive: Writing Archive.")
+  f["bytes"] = fileSize
+  f["fileType"] = fileType
+  log.Debug(f, "Writing Archive to storage.")
 
-  // TODO: Lookinto this and in particular figure out how to use an iamrole for this.
+  // TODO: Lookinto this and in particular the right access permissions here.
   aclString := "public-read"
 
-  // Gratuitous use of aws because of some
-  // issues with the compiler.
-  b := aws.String(bucketName)
 
   params := &s3.PutObjectInput{
-    Bucket: b,
+    Bucket: aws.String(bucketName),
     Key: aws.String(path),
     ACL: aws.String(aclString),
     Body: fileBytes,
@@ -195,7 +209,11 @@ func PublishArchive(archiveFileName string, bucketName string, path string, sess
     // UserName: user,
     PutObjectOutput: resp,
   }
-
+  if err == nil {
+    log.Info(f, "Archive published.")
+  } else {
+    log.Error(f, "Error publishing archive.", err)
+  }
   return returnResp, err
 }
 
