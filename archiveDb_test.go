@@ -40,7 +40,7 @@ func TestArchivePath(t *testing.T) {
 
   ap := archivePath(u,s,ServerSnapshot)
   assert.Equal(t, ap, ex, "ArchivePath didn't work.")
-  fmt.Printf("Snapshot ArchivePath: %s\n", ap)
+  // fmt.Printf("Snapshot ArchivePath: %s\n", ap)
 }
 
 // Full path Spec
@@ -59,7 +59,7 @@ func TestSnapshotPath(t *testing.T) {
   exFileName := whenString + "-" + user + "-" + server + archiveExt
   acFileName := archiveFileName(user, server, when, ServerSnapshot)
   assert.Equal(t, exFileName, acFileName, "archiveFileName isn't right")
-  fmt.Printf("Snapshot File Name: %s\n", acFileName)
+  // fmt.Printf("Snapshot File Name: %s\n", acFileName)
 
   // Full URI
   exURI := S3BaseURI + S3Delim + bucket + S3Delim + user + S3Delim + 
@@ -67,8 +67,8 @@ func TestSnapshotPath(t *testing.T) {
   acURI := ServerSnapshotURI(bucket, user, server, exFileName)
   assert.Equal(t, exURI, acURI, "URI isn't right.")
 
-  fmt.Printf("%s\n", exURI)
-  fmt.Printf("%s\n", acURI)
+  // fmt.Printf("%s\n", exURI)
+  // fmt.Printf("%s\n", acURI)
 }
 
 func getRandomArchiveType() (ArchiveType) {

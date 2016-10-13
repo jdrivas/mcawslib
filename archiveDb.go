@@ -8,6 +8,9 @@ import(
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/s3"
   "github.com/Sirupsen/logrus"
+
+  "awslib"
+  // "github.com/jdrivas/awslib"
 )
 
 // 
@@ -72,7 +75,8 @@ func NewArchive(t ArchiveType, userName, serverName string, bucketName string, o
 }
 
 func (a Archive) URI() (uri string) {
-  return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", a.Bucket, a.S3Key())
+  return awslib.S3URI(a.Bucket, a.S3Key())
+  // return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", a.Bucket, a.S3Key())
 }
 
 func (a Archive) S3Key() (k string) {

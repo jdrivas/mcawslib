@@ -6,7 +6,7 @@ import(
   "time"
 )
 
-func (s *Server) TakeServerSnapshot() (resp *PublishedArchiveResponse, err error) {
+func (s *Server) TakeServerSnapshot() (*PublishedArchiveResponse, error) {
   files := s.serverSnapshotFiles()
   return s.SafeArchiveThenPublish(files, ServerSnapshot)
 }
@@ -15,7 +15,7 @@ func (s *Server) TakeServerSnapshot() (resp *PublishedArchiveResponse, err error
 //   return s.SafeArchiveThenPublishWithRetry(retries, waitTime, ServerSnapshot)
 // }
 
-func (s *Server) TakeWorldSnapshot() (resp *PublishedArchiveResponse, err error) {
+func (s *Server) TakeWorldSnapshot() (*PublishedArchiveResponse, error) {
   files := s.worldSnapshotFiles()
   return s.SafeArchiveThenPublish(files, WorldSnapshot)
 }
@@ -24,7 +24,7 @@ func (s *Server) TakeWorldSnapshot() (resp *PublishedArchiveResponse, err error)
 //   return s.SafeArchiveThenPublishWithRetry(retries, waitTime, WorldSnapshot)
 // }
 
-func (s *Server) TakeSnapshotWithFiles(files []string) (resp *PublishedArchiveResponse, err error) {
+func (s *Server) TakeSnapshotWithFiles(files []string) (*PublishedArchiveResponse, error) {
   return s.SafeArchiveThenPublish(files, MiscSnapshot)
 }
 
@@ -41,25 +41,6 @@ func (s *Server) SafeArchiveThenPublish(files []string, aType ArchiveType) ( res
   return resp, err
 }
 
-// Like safe archive above, but will retry the rcon connectoin and wait between retries.
-// func (s *Server) SafeArchiveThenPublishWithRetry(retries int, waitTime time.Duration, 
-//   aType ArchiveType) (resp *PublishedArchiveResponse, err error) {
-
-//   if !s.HasRconConnection() {
-//     if s.NoRcon() { 
-//       return nil, fmt.Errorf("Invalid rcon connection paramaters: %s:%s ", s.PublicServerIp, s.RconPort )
-//     }
-//     if len(s.RconPassword) == 0 {
-//       return nil, fmt.Errorf("No rcon password.")
-//     }
-
-//     _, err = s.NewRconWithRetry(retries, waitTime)
-//     if err != nil { return nil, err }
-//   }
-
-//   resp, err = s.archiveAndPublish(aType)
-//   return resp, err
-// }
 
 // Convenience wrapper around GetArchives and then pulling the snaps
 // from them. See archiveDB.
@@ -73,11 +54,15 @@ func (s *Server) GetWorldSnapshots() (snaps []Archive, err error){
   return snaps, err
 }
 
-func (s *Server) GetLatestWorldSnapshot() (snap Archive, err error) {
+func (s *Server) GetLatestWorldSnapshot() (snap *Archive, err error) {
   snaps, err  := s.GetWorldSnapshots()
   if err != nil { return snap, fmt.Errorf("Failed to get most recent world backup: %s", err) }
-  sort.Sort(ByLastMod(snaps))
-  snap = snaps[len(snaps)-1]
+  if len(snaps) == 0 {
+    err = fmt.Errorf("No snapshots found.")
+  } else {
+    sort.Sort(ByLastMod(snaps))
+    snap = &snaps[len(snaps)-1]
+  }
   return snap, err
 }
 

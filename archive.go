@@ -14,6 +14,9 @@ import(
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/s3"
   "github.com/Sirupsen/logrus"
+
+  "awslib"
+  // "github.com/jdrivas/awslib"
 )
 
 const FormatForTimeName = time.RFC3339
@@ -21,12 +24,13 @@ const FormatForTimeName = time.RFC3339
 type PublishedArchiveResponse struct {
   ArchiveFilename string
   BucketName string
-  StoredPath string
-  UserName string
+  Key string
   PutObjectOutput *s3.PutObjectOutput
 }
 
-
+func (p PublishedArchiveResponse) URI() (string) {
+  return awslib.S3URI(p.BucketName, p.Key)
+}
 // Create a zipfile (archive) at the serverDirectory and publish it to publishPath on S3.
 func ArchiveAndPublish(rcon *Rcon, fileNames []string, serverDirectory, bucketName, publishPath string, sess *session.Session) (resp *PublishedArchiveResponse, err error) {
   archiveDir := os.TempDir()
@@ -205,8 +209,7 @@ func PublishArchive(archiveFileName string, bucketName string, path string, sess
   returnResp := &PublishedArchiveResponse{
     ArchiveFilename: archiveFileName,
     BucketName: bucketName,
-    StoredPath: path,
-    // UserName: user,
+    Key: path,
     PutObjectOutput: resp,
   }
   if err == nil {

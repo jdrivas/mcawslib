@@ -252,7 +252,7 @@ func GetServer(clusterName, taskArn string, sess *session.Session) (s *Server, e
 // we have things like allocated ports.
 func GetServerWait(clusterName, taskArn string, sess *session.Session) (s *Server, err error) {
   err = awslib.WaitForTaskRunning(clusterName, taskArn, sess)
-  if err != nil { return s, fmt.Errorf("Failed to wait for task: s", err) }
+  if err != nil { return s, fmt.Errorf("Failed to wait for task: %s", err) }
   return GetServer(clusterName, taskArn, sess)
 }
 
