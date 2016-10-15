@@ -349,6 +349,7 @@ func (p* Proxy) StopProxyForServer(s *Server) (error) {
   return err
 }
 
+// TODO: This needs to look up forced hosts NOT servers.
 func (p *Proxy) IsServerProxied(s *Server) (bool, error) {
   serverNames, err := p.ServerNames()
   if err != nil { return false, err }

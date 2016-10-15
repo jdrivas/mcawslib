@@ -185,6 +185,7 @@ func (p *Proxy) DetachFromProxyNetwork(s *Server) (changeInfo *route53.ChangeInf
 // Returns the server FQDN constructed from actual DNS for the proxy and the DNSName() from the server.
 // Returns an error if it can't find the DNS for the proxy.
 // serverFQDN does not have a  trailing ".".
+// TODO. This should look up the actual servers record and behave like DNSName() above.
 func (p* Proxy) ProxiedServerFQDN(s *Server) (serverFQDN string, err error) {
   proxyFQDN, _, err := p.PublicDNS()
   if err == nil {
