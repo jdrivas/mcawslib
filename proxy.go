@@ -14,19 +14,28 @@ import(
 // TODO: Is there state that we need to save on the 
 // Proxy? Probably as we addd plugins.
 type Proxy struct {
+
+  // Name
   Name string
-  ClusterName string
+
   // TODO: Let's wait on adding a point to the hub server directly.
   // You can find it if you need it.
   // Hub *Server
 
+  // Network
   PublicProxyIp string
   PrivateProxyIp string
   ProxyPort Port
+
+  // Rcon
   RconPort Port
   RconPassword string
   Rcon *Rcon
 
+  // Archive ??
+
+  // Task/Container
+  ClusterName string
   TaskArn string
   AWSSession *session.Session
 }
@@ -160,6 +169,7 @@ func (p *Proxy) PublicIpAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PublicProxyIp, p.ProxyPort)
 }
 
+// Note this address will only be reachable on the VPN.
 func (p *Proxy) RconAddress() (string) {
   return fmt.Sprintf("%s:%d", p.PrivateProxyIp, p.RconPort)
 }
@@ -199,8 +209,14 @@ func (p *Proxy) GetRcon() (rcon *Rcon, err error) {
 // Add the server to the proxy. Access to server is availble when connected
 // through the proxy.
 func (p *Proxy) AddServerAccess(s *Server) (err error) {
+
+  // We only want to connect internally to the VPN.
+  // These should not be exposed.
+  // serverAddress := s.PublicServerAddress()
+  serverAddress := s.ServerAddress()
+
   f:= logrus.Fields{
-    "proxy": p.Name, "server": s.Name, "user": s.User, "serverAddress": s.PublicServerAddress(),
+    "proxy": p.Name, "server": s.Name, "user": s.User, "serverAddress": serverAddress,
   }
   log.Info(f, "Adding server access to proxy.")
 
@@ -211,11 +227,9 @@ func (p *Proxy) AddServerAccess(s *Server) (err error) {
   rcon, err := p.GetRcon()
   if err != nil { return err }
 
-  // TODO: Once networking is properly worked out, this should change
-  // to a private address.
   motd := fmt.Sprintf("%s hosted by %s in the %s neighborhood.", s.Name, s.User, s.Name)
   command :=  fmt.Sprintf("bconf addServer(\"%s\", \"%s\", \"%s\", false)",
-    s.Name, motd, s.PublicServerAddress())
+    s.Name, motd, serverAddress)
 
   reply, err := rcon.Send(command)
   f["command"] = command
@@ -362,6 +376,10 @@ func (p *Proxy) IsServerProxied(s *Server) (bool, error) {
   }
   return found, err
 }
+
+// TODO: Addecd getServerAddress 
+// returns something using something like: bconf getServers().getSection(s.Name).get("address")
+
 
 // The names of the servers that are currently available through this proxy.
 // Yes, of course I know this is not the way to do this.

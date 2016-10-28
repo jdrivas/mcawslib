@@ -90,8 +90,19 @@ func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
     mesg := fmt.Sprintf("Error launching server: %s", err)
     return s, NewEmptyTaskError(mesg)
   }
-  taskArn := *resp.Tasks[0].TaskArn
 
+  if len(resp.Tasks) <= 0 {
+    var e TaskError
+    if len(resp.Failures) > 0 {
+      e = NewTaskError("Failures returned in launch. No task created", resp.Tasks, resp.Failures)
+    } else {
+      e = NewEmptyTaskError("No tasks or failures returned from launch")
+    }
+    log.Error(f, "Failure while launching server.", e)
+    return s, e
+  }
+
+  taskArn := *resp.Tasks[0].TaskArn
 
   if len(resp.Tasks) > 1 || len(resp.Failures) > 0 { 
     var mesg string
@@ -113,6 +124,10 @@ func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
   }
 
   s, err = GetServer(ss.Cluster, taskArn, ss.AWSSession)
+  // force merge with new server fields.
+  for k, v := range s.LogFields() {
+    f[k] = v
+  }
   f["serverType"] = s.CraftType()
   f["taskArn"] = taskArn
   log.Info(f, "Launched server.")

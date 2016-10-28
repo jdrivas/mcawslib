@@ -44,21 +44,29 @@ func (s *Server) SafeArchiveThenPublish(files []string, aType ArchiveType) ( res
 
 // Convenience wrapper around GetArchives and then pulling the snaps
 // from them. See archiveDB.
-func (s *Server) GetServerSnapshots() (snaps []Archive, err error) {
+func (s *Server) ServerSnapshots() (snaps []Archive, err error) {
   snaps, err = GetArchivesForServer(ServerSnapshot, s.User, s.Name, s.ArchiveBucket, s.AWSSession)
   return snaps, err
 }
 
-func (s *Server) GetWorldSnapshots() (snaps []Archive, err error){
+func (s *Server) WorldSnapshots() (snaps []Archive, err error){
   snaps, err = GetArchivesForServer(WorldSnapshot, s.User, s.Name, s.ArchiveBucket, s.AWSSession)
   return snaps, err
 }
 
-func (s *Server) GetLatestWorldSnapshot() (snap *Archive, err error) {
-  snaps, err  := s.GetWorldSnapshots()
-  if err != nil { return snap, fmt.Errorf("Failed to get most recent world backup: %s", err) }
+func (s *Server) LatestWorldSnapshot() (snap *Archive, err error) {
+  return s.GetLatestSnapshot(WorldSnapshot)
+}
+
+func (s *Server) LatestServerSnapshot() (snap *Archive, err error) {
+  return s.GetLatestSnapshot(ServerSnapshot)
+}
+
+func (s *Server) GetLatestSnapshot(t ArchiveType) (snap *Archive, err error) {
+  snaps, err := GetArchivesForServer(t, s.User, s.Name, s.ArchiveBucket, s.AWSSession)
+  if err != nil { return snap, fmt.Errorf("Failed to get the most recent snapshot (%s): %s", t.String(), err) }
   if len(snaps) == 0 {
-    err = fmt.Errorf("No snapshots found.")
+    err = fmt.Errorf("No %s snapshots found.", t.String())
   } else {
     sort.Sort(ByLastMod(snaps))
     snap = &snaps[len(snaps)-1]

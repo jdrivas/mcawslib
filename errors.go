@@ -50,18 +50,18 @@ type TaskError struct {
   Failures []*ecs.Failure
 }
 
-func NewEmptyTaskError(mesg string) (*TaskError) {
+func NewEmptyTaskError(mesg string) (TaskError) {
   return NewTaskError(mesg, []*ecs.Task{}, []*ecs.Failure{})
 }
 
-func NewTaskError(mesg string, tasks []*ecs.Task, fails []*ecs.Failure) (*TaskError) {
-  return &TaskError{
+func NewTaskError(mesg string, tasks []*ecs.Task, fails []*ecs.Failure) (TaskError) {
+  return TaskError{
     Message: mesg,
     Tasks: tasks,
     Failures: fails,
   }
 }
 
-func (e *TaskError) Error() string {
-  return fmt.Sprintf("%s: Errors(%d), Failures (%d)", e.Message, len(e.Tasks), len(e.Failures))
+func (e TaskError) Error() string {
+  return fmt.Sprintf("%s: Tasks(%d), Failures (%d)", e.Message, len(e.Tasks), len(e.Failures))
 }

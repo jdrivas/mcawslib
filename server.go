@@ -199,22 +199,27 @@ func NewPort(ps string) (Port, error) {
 // I expect we should. I don't think we should contemplate servers running
 // generally wihtout their controllers. 
 type Server struct {
+
+  // Name
   User string
   Name string
-  ClusterName string
 
+  // Network
   PublicServerIp string // Consider wether we need an ARN for an ElasticIP.
   PrivateServerIp string  
-
   ServerPort Port
-  RconPort Port
 
+  // Rcon
+  RconPort Port
   RconPassword string
   Rcon *Rcon
   
+  // Archive
   ArchiveBucket string
   ServerDirectory string
 
+  // Task/Container
+  ClusterName string
   TaskArn *string
   DeepTask *awslib.DeepTask
   AWSSession *session.Session
@@ -256,13 +261,19 @@ func GetServerWait(clusterName, taskArn string, sess *session.Session) (s *Serve
   return GetServer(clusterName, taskArn, sess)
 }
 
+// TODO: return an error on non-unique names.
+// Retruns the first server foudn with the same name in the cluster.
+// Not a good idea if there are non-unique names ......
 func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err error) {
   servers, err := GetServers(cluster, sess)
   if err != nil {return s, err}
   for _, srv := range servers {
     if srv.Name == n {
-      s = srv
-      break
+      if s == nil {
+        s = srv
+      } else {
+        return s, fmt.Errorf("Found more than one server with name %s", n)
+      }
     }
   }
   if s == nil {
@@ -312,36 +323,32 @@ func GetServerFromTask(dt *awslib.DeepTask, sess *session.Session) (s *Server, o
   return s, ok
 }
 
-func GetServerContainerNames() []string {
-  return []string{MinecraftServerContainerName, BungeeProxyHubServerContainerName,}
-}
+// Stops the task associated with this server.
+func (s *Server) Terminate() (taskArn string, err error) {
+  taskArn = *s.TaskArn
+  _, err = awslib.StopTask(s.ClusterName, *s.TaskArn, s.AWSSession)
 
-func GetControllerContainerNames() []string {
-  return []string{MinecraftControllerContainerName, BungeeProxyHubControllerContainerName,}
-}
-
-func getServerEnv(dt *awslib.DeepTask) (map[string]string, bool) {
-  return dt.EnvironmentFromNames(GetServerContainerNames())
-}
-
-func getControllerEnv(dt *awslib.DeepTask) (map[string]string, bool) {
-  return dt.EnvironmentFromNames(GetControllerContainerNames())
-}
-
-// Returns we find in the list.
-func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Container, ok bool) {
-  for _, cn := range containers {
-    cntr, k := dt.GetContainer(cn)
-    if k {
-      c = cntr
-      ok = true
-      break
-    }
+  f := s.LogFields()
+  f["operation"] = "TermminateServer"
+  if err != nil {
+    log.Error(f, "Error terminating server.", err)
+  } else {
+    log.Info(f, "Terminating server.")
   }
-  return c, ok
+
+  return taskArn, err
 }
 
+// Default address for server.
+// This should a VPN address as opposed
+// to a publically accessible address.
+func (s *Server) ServerAddress() (string) {
+  return s.PrivateServerIp + ":" + s.ServerPort.String()
+}
 
+// TODO: Should this return an error or some other
+// way to note that there is no server address available
+// if we are not configured to expose the public address?
 
 // Returns the IP and the Port.
 func (s *Server) PublicServerAddress() (string) {
@@ -440,7 +447,39 @@ func (s *Server) LogFields() (logrus.Fields) {
   f["serverName"] = s.Name
   f["cluster"] = cluster
   f["arn"] = arn
+  f["serverAddress"] = s.ServerAddress()
+  f["rconAddress"] = s.RconAddress()
   return f
 }
 
+
+
+func GetServerContainerNames() []string {
+  return []string{MinecraftServerContainerName, BungeeProxyHubServerContainerName,}
+}
+
+func GetControllerContainerNames() []string {
+  return []string{MinecraftControllerContainerName, BungeeProxyHubControllerContainerName,}
+}
+
+func getServerEnv(dt *awslib.DeepTask) (map[string]string, bool) {
+  return dt.EnvironmentFromNames(GetServerContainerNames())
+}
+
+func getControllerEnv(dt *awslib.DeepTask) (map[string]string, bool) {
+  return dt.EnvironmentFromNames(GetControllerContainerNames())
+}
+
+// Returns we find in the list.
+func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Container, ok bool) {
+  for _, cn := range containers {
+    cntr, k := dt.GetContainer(cn)
+    if k {
+      c = cntr
+      ok = true
+      break
+    }
+  }
+  return c, ok
+}
 
