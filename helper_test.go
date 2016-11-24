@@ -13,7 +13,8 @@ import (
 
 const DefaultTestBucket = "momentlabs-test"
 
-func init() {  // If you want to repeat a test run with the same values over
+func init() {
+  // If you want to repeat a test run with the same values over
   // and over again, just remove this ... or you can give it 
   // a value that you keep using over again.
   rand.Seed(time.Now().UnixNano())
