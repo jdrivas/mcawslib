@@ -1,0 +1,56 @@
+{
+  "family": "rsyslog",
+  "networkMode": "bridge",
+  "taskRoleArn": null,
+  "volumes": null,
+  "containerDefinitions": [
+    {
+      "name": "rsyslog",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/craft-rsyslog",
+      "essential": true,
+      "memory": 512,
+      "memoryReservation": 512,
+      "cpu": 128,
+      "environment": [],
+      "dockerLabels": {
+        "service": "rsyslog"
+      },
+      "links": null,
+      "volumesFrom": [],
+      "workingDirectory": null,
+      "portMappings": [
+        {
+          "hostPort": 10514,
+          "containerPort": 514,
+          "protocol": "tcp"
+        },
+       {
+          "hostPort": 10514,
+          "containerPort": 514,
+          "protocol": "udp"
+        }      
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "craft-rsyslog",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "craft-logs"
+        }
+      },
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null,
+      "hostname": null,
+      "entryPoint": null,
+      "command": [],
+      "mountPoints": [],
+      "ulimits": null,
+      "dockerSecurityOptions": null,
+      "readonlyRootFilesystem": null,
+      "user": null,
+      "privileged": null
+    }
+  ]
+}

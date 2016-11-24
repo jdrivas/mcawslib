@@ -1,0 +1,120 @@
+{
+  "family": "bungee-spigot-logstash",
+  "networkMode": "bridge",
+  "taskRoleArn": null,
+  "volumes": null,
+  "containerDefinitions": [
+    {
+      "name": "minecraft",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "essential": true,
+      "memory": 2048,
+      "memoryReservation": 512,
+      "cpu": 128,
+      "environment": [
+        { "name": "CONTAINER_ROLE", "value": "CraftServer"},
+        { "name": "EULA", "value": "true" },
+        { "name": "TYPE", "value": "spigot" },
+        { "name": "ONLINE_MODE", "value": "false" },
+        { "name": "ENABLE_RCON", "value": "true" },
+        { "name": "RCON_PORT", "value": "25575" },
+        { "name": "RCON_PASSWORD", "value": "testing" },
+        { "name": "ENABLE_QUERY", "value": "true" },
+        { "name": "MODE", "value": "creative" },
+        { "name": "FORCE_GAMEMODE", "value": "true" },
+        { "name": "OPS", "value": "jdrivas" }
+      ],
+      "dockerLabels": {
+        "service": "minecraft"
+      },
+      "links": null,
+      "volumesFrom": [],
+      "workingDirectory": null,
+      "portMappings": [
+        {
+          "hostPort": 0,
+          "containerPort": 25575,
+          "protocol": "tcp"
+        },
+        {
+          "hostPort": 0,
+          "containerPort": 25565,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "syslog",
+        "options": {
+          "syslog-address": "udp://0.0.0.0:10514"
+        }
+      },
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null,
+      "hostname": null,
+      "entryPoint": null,
+      "command": [
+        "--noconsole"
+      ],
+      "mountPoints": [],
+      "ulimits": null,
+      "dockerSecurityOptions": null,
+      "readonlyRootFilesystem": null,
+      "user": null,
+      "privileged": null
+    },
+    {
+      "name": "minecraft-control",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "essential": false,
+      "memoryReservation": 128,
+      "memory": 500,
+      "cpu": 64,
+      "environment": [
+          { "name": "CONTAINER_ROLE", "value": "CraftController" },
+          { "name": "SERVER_USER", "value": "testuser" },
+          { "name": "SERVER_NAME", "value": "spigot-test" },
+          { "name": "ARCHIVE_BUCKET", "value": "craft-config-test" },
+          { "name": "AWS_REGION", "value": "us-east-1" }
+      ],
+      "entryPoint": [
+        "craft-config",
+        "--debug",
+        "archive",
+        "--continuous",
+        "--server-ip=minecraft"
+      ],
+      "dockerLabels": null,
+      "links": [
+        "minecraft"
+      ],      
+      "volumesFrom": [
+        {
+          "readOnly": null,
+          "sourceContainer": "minecraft"
+        }
+      ],
+      "workingDirectory": "/data",
+      "portMappings": [],
+      "logConfiguration": {
+        "logDriver": "syslog",
+        "options": {
+          "syslog-address": "udp://0.0.0.0:10514"
+        }
+      },      
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null,
+      "hostname": null,
+      "mountPoints": null,
+      "ulimits": null,
+      "dockerSecurityOptions": null,
+      "readonlyRootFilesystem": null,
+      "command": null,
+      "user": null,
+      "privileged": null
+    }
+  ]
+}

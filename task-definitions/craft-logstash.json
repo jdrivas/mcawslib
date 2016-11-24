@@ -1,0 +1,56 @@
+{
+  "family": "craft-logstash",
+  "volumes": [],
+  "networkMode": "bridge",
+  "taskRoleArn": null,
+  "containerDefinitions": [
+    {
+      "name": "craft-logstash",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/craft-logstash",
+      "essential": true,
+      "cpu": 128,
+      "memory": 1024,
+      "memoryReservation": 512,
+      "ulimits": null,
+      "portMappings": [
+        {
+          "hostPort": 20514,
+          "containerPort": 20514,
+          "protocol": "tcp"
+        },
+        {
+          "hostPort": 20514,
+          "containerPort": 20514,
+          "protocol": "udp"
+        }
+      ],
+      "hostname": null,
+      "entryPoint": null,
+      "command": null,
+      "user": null,
+      "workingDirectory": null,
+      "environment": [],
+      "dockerLabels": {
+        "service": "craft-logstash"
+      },
+      "links": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "readonlyRootFilesystem": null,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "craft-logs",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "craft-logstash"
+        }
+      },
+      "dockerSecurityOptions": null,
+      "privileged": null,
+      "extraHosts": null,
+      "dnsServers": null,
+      "disableNetworking": null,
+      "dnsSearchDomains": null
+    }
+  ]
+}
