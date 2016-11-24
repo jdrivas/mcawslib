@@ -317,9 +317,7 @@ func GetServerFromTask(dt *awslib.DeepTask, sess *session.Session) (s *Server, o
       DeepTask: dt,
       AWSSession: sess,
     }
-  } else {
-    fmt.Printf("Ddin't return controller.\n")
-  }
+  } 
   return s, ok
 }
 
@@ -342,22 +340,22 @@ func (s *Server) Terminate() (taskArn string, err error) {
 // Default address for server.
 // This should a VPN address as opposed
 // to a publically accessible address.
+// Returns the IP and the port.
 func (s *Server) ServerAddress() (string) {
   return s.PrivateServerIp + ":" + s.ServerPort.String()
-}
-
-// TODO: Should this return an error or some other
-// way to note that there is no server address available
-// if we are not configured to expose the public address?
-
-// Returns the IP and the Port.
-func (s *Server) PublicServerAddress() (string) {
-  return s.PublicServerIp + ":" + s.ServerPort.String()
 }
 
 // Returned the IP and the port
 func (s *Server) RconAddress() (string) {
   return s.PrivateServerIp + ":" + s.RconPort.String()
+}
+
+// TODO: Should this return an error or some other
+// way to note that there is no server address available
+// if we are not configured to expose the public address?
+// Returns the IP and the Port.
+func (s *Server) PublicServerAddress() (string) {
+  return s.PublicServerIp + ":" + s.ServerPort.String()
 }
 
 // Convenience to check the DeepTask and DeepTask.Task for non-null
@@ -451,7 +449,6 @@ func (s *Server) LogFields() (logrus.Fields) {
   f["rconAddress"] = s.RconAddress()
   return f
 }
-
 
 
 func GetServerContainerNames() []string {
