@@ -6,7 +6,7 @@
   "containerDefinitions": [
     {
       "name": "minecraft",
-      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/craft-server",
       "essential": true,
       "memory": 2048,
       "memoryReservation": 512,
@@ -66,7 +66,7 @@
     },
     {
       "name": "minecraft-control",
-      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/minecraft-ecs",
+      "image": "033441544097.dkr.ecr.us-east-1.amazonaws.com/craft-controller",
       "essential": false,
       "memoryReservation": 128,
       "memory": 500,
