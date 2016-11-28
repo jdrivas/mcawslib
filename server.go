@@ -415,6 +415,11 @@ func (s *Server) ControllerContainerStatus() string {
   return status
 }
 
+// StartedAt - when the server started.
+func (s *Server) StartedAtString() (string) {
+  return s.DeepTask.StartedAtString()
+}
+
 // Uptime  of the server task nicely formatted (awslib.UptimeString())
 func (s *Server) UptimeString() (string) {
   return s.DeepTask.UptimeString()
