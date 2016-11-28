@@ -38,11 +38,13 @@
       "volumesFrom": [],
       "readonlyRootFilesystem": null,
       "logConfiguration": {
-        "logDriver": "syslog",
+        "logDriver": "awslogs",
         "options": {
-          "syslog-address": "udp://0.0.0.0:10514"
+          "awslogs-group": "craft-logs",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "craft-logstash"
         }
-      },    
+      },
       "dockerSecurityOptions": null,
       "privileged": null,
       "extraHosts": null,

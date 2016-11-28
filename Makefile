@@ -6,11 +6,10 @@ help:
 	@echo release \# push master branch to github and then do a local go update.
 
 check:
-	# I'm pretty sure there's a better way to do this ....
 	@ if grep -e '^[[:space:]]*\"awslib\"' *go ; then \
 		echo "Fix the library refrence."; \
 		exit -1; \
-	else echo "Checked."; \
+	else echo "Checked o.k."; \
 	fi
 
 
