@@ -110,7 +110,7 @@ func GetProxies(clusterName string, sess *session.Session) (p []*Proxy, dtm awsl
 // }
 
 func GetProxy(clusterName, taskArn string, sess *session.Session) (p *Proxy, err error) {
-  dt, err := awslib.GetDeepTask(clusterName, taskArn, sess)
+  dt, err := awslib.GetDeepTask(clusterName, awslib.ShortArnString(&taskArn), sess)
   var ok bool
   if err == nil {
     p, ok = GetProxyFromTask(dt, taskArn, sess)
