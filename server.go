@@ -3,6 +3,7 @@ package mclib
 import(
   "fmt"
   "strconv"
+  "strings"
   "time"
   // "github.com/aws/aws-sdk-go/aws"
   "github.com/aws/aws-sdk-go/aws/session"
@@ -288,6 +289,7 @@ func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err
 // of trouble this will cause. At least we know we have to coordinate closely with the 
 // task-definitions.
 func GetServerFromTask(dt *awslib.DeepTask, sess *session.Session) (s *Server, ok bool) {
+  log.Debug(logrus.Fields{"taskArn": dt.Task.TaskArn}, "Getting a server from a DeepTask.")
   serverEnv, ok := getServerEnv(dt)
   controllerEnv, _ := getControllerEnv(dt)
   if ok {
@@ -455,7 +457,6 @@ func (s *Server) LogFields() (logrus.Fields) {
   return f
 }
 
-
 func GetServerContainerNames() []string {
   return []string{MinecraftServerContainerName, BungeeProxyHubServerContainerName,}
 }
@@ -485,3 +486,41 @@ func getContainerFromNames(containers []string, dt*awslib.DeepTask) (c *ecs.Cont
   return c, ok
 }
 
+// Server Sorting Interface
+// To create a new sorting category use ByStartAt as a template, 
+// just replace the less function.
+//
+// To use:
+// servers []*Server 
+// sort.Srot(ByStartAt(servers))
+
+type serverSort struct {
+  s []*Server
+  less func(i,j *Server) (bool)
+}
+func (ss serverSort) Len() int { return len(ss.s) }
+func (ss serverSort) Swap(i, j int) { ss.s[i], ss.s[j] = ss.s[j], ss.s[i] }
+func( ss serverSort) Less(i, j int) bool { return ss.less( ss.s[i], ss.s[j]) }
+
+func ByStartAt(servers []*Server) (serverSort) {
+  return serverSort{
+    s: servers,
+    less: func(si, sj *Server) (bool) {
+      ti := si.DeepTask.Task.StartedAt
+      tj := sj.DeepTask.Task.StartedAt 
+      // From time to time we get nil times,
+      // usually due to querying the interface before the container has started.
+      switch {
+      case ti == nil && tj == nil:
+        r := strings.Compare(fmt.Sprintf("%s", si),fmt.Sprintf("%s", sj))
+        switch {
+        case  r <= 0: return true
+        case r > 0: return false
+      }
+      case ti == nil: return true
+      case tj == nil: return false
+      }
+      return si.DeepTask.Task.StartedAt.Before(*sj.DeepTask.Task.StartedAt)
+    },
+  }
+}
