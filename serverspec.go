@@ -62,7 +62,7 @@ func NewServerSpec(userName, serverName, region, bucketName, cluster, tdArn stri
   return ss, err
 }
 
-func (ss *ServerSpec) defaultLogFields() (logrus.Fields) {
+func (ss *ServerSpec) DefaultLogFields() (logrus.Fields) {
   return logrus.Fields{
     "cluster": ss.Cluster, "TaskDefinition": *ss.TaskDefinition.TaskDefinitionArn,
     "userName": ss.UserName(), "serverName": ss.ServerName(),
@@ -73,7 +73,7 @@ func (ss *ServerSpec) defaultLogFields() (logrus.Fields) {
 // If returned, the error will be a TaskError
 func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
 
-  f := ss.defaultLogFields()
+  f := ss.DefaultLogFields()
 
   controlEnv := ss.ControllerContainerEnv()
   if controlEnv[ArchiveBucketKey] == "" {

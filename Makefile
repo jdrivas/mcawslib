@@ -2,7 +2,7 @@ lib := mclib
 repo := github.com/jdrivas/$(lib)
 
 help:
-	@echo check \# run a grep to look for awslib that haven't been commented.
+	@echo check \# run a grep to look for awslib that havent been commented.
 	@echo release \# push master branch to github and then do a local go update.
 
 check:

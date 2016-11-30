@@ -244,12 +244,22 @@ func GetServers(clusterName string, sess *session.Session) (s []*Server, err err
 func GetServer(clusterName, taskArn string, sess *session.Session) (s *Server, err error){
   dtm, err := awslib.GetDeepTasks(clusterName, sess)
   if err != nil { return s, fmt.Errorf("Failed to get Server information: %s", err) }
-  dt := dtm[taskArn]
-  s, ok := GetServerFromTask(dt, sess)
-  s.ClusterName = clusterName
 
+  dt := dtm[awslib.ShortArnString(&taskArn)]
+  if dt == nil {
+    err = fmt.Errorf("Failed to get server, couldn't find DeepTask in returned map for taskArn: %s", taskArn)
+    log.Error(logrus.Fields{"cluster": clusterName, "taskArn": taskArn,}, "Failed to get server.", err)
+    return s, err
+  }
+
+  s, ok := GetServerFromTask(dt, sess)
   if !ok {
     err = fmt.Errorf("Error finding server for %s/%s : %s", clusterName, taskArn, err)
+  } else {
+    f := s.LogFields()
+    f["clusterNameArg"] = clusterName
+    f["taskArnArg"] = taskArn
+    log.Debug(f, "Retrieved server from task.")
   }
   return s, err
 }
