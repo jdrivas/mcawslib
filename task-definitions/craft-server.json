@@ -45,7 +45,7 @@
       "logConfiguration": {
         "logDriver": "syslog",
         "options": {
-          "syslog-address": "udp://0.0.0.0:10514"
+          "syslog-address": "tcp://0.0.0.0:10514"
         }
       },
       "extraHosts": null,
@@ -100,7 +100,7 @@
       "logConfiguration": {
         "logDriver": "syslog",
         "options": {
-          "syslog-address": "udp://0.0.0.0:10514"
+          "syslog-address": "tcp://0.0.0.0:10514"
         }
       },      
       "extraHosts": null,

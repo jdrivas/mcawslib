@@ -23,12 +23,7 @@
           "hostPort": 10514,
           "containerPort": 514,
           "protocol": "tcp"
-        },
-       {
-          "hostPort": 10514,
-          "containerPort": 514,
-          "protocol": "udp"
-        }      
+        }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
