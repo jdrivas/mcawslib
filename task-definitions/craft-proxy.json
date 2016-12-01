@@ -27,6 +27,7 @@
       "user": null,
       "workingDirectory": null,
       "environment": [
+        { "name": "CONTAINER_ROLE", "value": "CraftHubServer" },
         { "name": "ENABLE_QUERY", "value": "TRUE" },
         { "name": "ENABLE_RCON", "value": "true" },
         { "name": "EULA", "value": "TRUE" },
@@ -81,7 +82,9 @@
       "command": null,
       "user": null,
       "workingDirectory": "/data",
-      "environment": [],
+      "environment": [        
+        { "name": "CONTAINER_ROLE", "value": "CraftController" }
+      ],
       "dockerLabels": null,
       "links": [
         "minecraft-hub",
@@ -133,7 +136,9 @@
       "command": null,
       "user": null,
       "workingDirectory": null,
-      "environment": [],
+      "environment": [
+        { "name": "CONTAINER_ROLE", "value": "CraftProxy" }
+      ],
       "dockerLabels": null,
       "links": [
         "minecraft-hub"
