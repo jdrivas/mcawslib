@@ -19,15 +19,21 @@ import(
 // Proxy versions of these live in proxy.go
 const (
   DefaultVanillaServerTaskDefinition = "minecraft-ecs"
-  DefaultProxiedServerTaskDefinition = "bungee-spigot-nc"
+  // DefaultProxiedServerTaskDefinition = "bungee-spigot-nc"
+  DefaultProxiedServerTaskDefinition = "craft-server"
   DefaultServerTaskDefinition = DefaultProxiedServerTaskDefinition
 
+  // TODO: Find a better way to do this. Probably using role key.
+  // These are critical container names that are used
+  // by the system to differentiate among environments
+  // from a container.
+  // THIS IS LIKELY A MISTAKE.
   MinecraftServerContainerName = "minecraft"
   MinecraftControllerContainerName = "minecraft-backup"
 )
 
 const (
-  MinecraftServerDefaultArchiveBucket = "craft-cofig-test"
+  MinecraftServerDefaultArchiveBucket = "craft-config-test"
 )
 
 //

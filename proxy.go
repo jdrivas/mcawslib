@@ -43,6 +43,7 @@ type Proxy struct {
 // These are critical constants to the behavior of
 // the system, specifically ecs-craft and the task-definitions
 // all rely on using these names correctly.
+// They are used to get the environment variables for the objects.
 const (
   DefaultProxyTaskDefinition = BungeeProxyRandomPortTaskDef
   BungeeProxyServerContainerName = "bungee"
@@ -55,7 +56,8 @@ const (
 // There is currently no auto-generation of these configs
 // and so they are kept in sync by hand!
 const(  
-  BungeeProxyDefaultPortTaskDef = "bungee-default"
+  // BungeeProxyDefaultPortTaskDef = "bungee-default"
+  BungeeProxyDefaultPortTaskDef = "craft-proxy"
   BungeeProxyRandomPortTaskDef = "bungee-random"
 )
 
