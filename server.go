@@ -278,9 +278,8 @@ func GetServerWait(clusterName, taskArn string, sess *session.Session) (s *Serve
   return GetServer(clusterName, taskArn, sess)
 }
 
-// TODO: return an error on non-unique names.
-// Retruns the first server foudn with the same name in the cluster.
-// Not a good idea if there are non-unique names ......
+// Returns a server for the serverName in the cluster.
+// Will error if it can't find one, or if there are more than one with the same name.
 func GetServerFromName(n, cluster string, sess *session.Session) (s *Server, err error) {
   servers, err := GetServers(cluster, sess)
   if err != nil {return s, err}

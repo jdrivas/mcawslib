@@ -2,6 +2,7 @@ package mclib
 
 import(
   "fmt"
+  "strings"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/ecs"
   "github.com/Sirupsen/logrus"
@@ -72,6 +73,15 @@ func (ss *ServerSpec) DefaultLogFields() (logrus.Fields) {
 
 // If returned, the error will be a TaskError
 func (ss* ServerSpec) LaunchServer() (s *Server, err error) {
+
+  // Check for duplicate names.
+  existingS, err := GetServers(ss.Cluster, ss.AWSSession)
+  if err != nil { return s, err }
+  for _, es := range existingS {
+    if strings.Compare(es.Name, ss.ServerName()) == 0 {
+      return s, fmt.Errorf("Can't launch, server name already exists: %s", es.Name)
+    }
+  }
 
   f := ss.DefaultLogFields()
 
