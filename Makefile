@@ -14,6 +14,7 @@ check:
 
 
 release: check
-	@echo Pushing $(repo) to git and getting local copy of library to go env.
+	git status
+	go build
 	git push
 	go get -u $(repo)

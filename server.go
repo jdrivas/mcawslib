@@ -3,7 +3,7 @@ package mclib
 import(
   "fmt"
   "strconv"
-  "strings"
+  // "strings"
   "time"
   // "github.com/aws/aws-sdk-go/aws"
   "github.com/aws/aws-sdk-go/aws/session"
@@ -520,22 +520,22 @@ func( ss serverSort) Less(i, j int) bool { return ss.less( ss.s[i], ss.s[j]) }
 func ByStartAt(servers []*Server) (serverSort) {
   return serverSort{
     s: servers,
-    less: func(si, sj *Server) (bool) {
-      ti := si.DeepTask.Task.StartedAt
-      tj := sj.DeepTask.Task.StartedAt 
-      // From time to time we get nil times,
-      // usually due to querying the interface before the container has started.
-      switch {
-      case ti == nil && tj == nil:
-        r := strings.Compare(fmt.Sprintf("%s", si),fmt.Sprintf("%s", sj))
-        switch {
-        case  r <= 0: return true
-        case r > 0: return false
-      }
-      case ti == nil: return true
-      case tj == nil: return false
-      }
-      return si.DeepTask.Task.StartedAt.Before(*sj.DeepTask.Task.StartedAt)
-    },
+    less: func(si, sj *Server) (bool) { return si.DeepTask.StartedAtLess(*sj.DeepTask) },
+      // ti := si.DeepTask.Task.StartedAt
+      // tj := sj.DeepTask.Task.StartedAt 
+      // // From time to time we get nil times,
+      // // usually due to querying the interface before the container has started.
+      // switch {
+      // case ti == nil && tj == nil:
+      //   r := strings.Compare(fmt.Sprintf("%s", si),fmt.Sprintf("%s", sj))
+      //   switch {
+      //   case  r <= 0: return true
+      //   case r > 0: return false
+      // }
+      // case ti == nil: return true
+      // case tj == nil: return false
+      // }
+      // return si.DeepTask.Task.StartedAt.Before(*sj.DeepTask.Task.StartedAt)
+    // },
   }
 }
